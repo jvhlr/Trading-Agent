@@ -16,7 +16,7 @@ from data.data_store import DataStore
 from data.data_collector import generate_sample_data
 
 class CandlestickItem(pg.GraphicsObject):
-    def __init__(self, data):
+    def __init__(self, data: list):
         super().__init__()
         self.data = data
         self.picture = QPicture()
@@ -38,10 +38,10 @@ class CandlestickItem(pg.GraphicsObject):
             p.drawRect(rect)
         p.end()
 
-    def paint(self, p, *args):
-        p.drawPicture(0, 0, self.picture)
+    def paint(self, painter, option, widget=None):  # type: ignore
+        painter.drawPicture(0, 0, self.picture)
 
-    def boundingRect(self):
+    def boundingRect(self):  # type: ignore
         return QRectF(self.picture.boundingRect())
 
 
@@ -105,7 +105,7 @@ class MarketPage(QWidget):
         self.plot_widget.showGrid(x=True, y=True, alpha=0.2)
         self.plot_widget.setLabel("left", "Price ($/oz)")
         self.plot_widget.setLabel("bottom", "Candle Bar Index")
-        chart_layout.addWidget(self.plot_widget)
+        chart_layout.addWidget(self.plot_widget)  # type: ignore
 
         layout.addWidget(chart_card, stretch=3)
 
@@ -117,7 +117,7 @@ class MarketPage(QWidget):
 
         table = QTableWidget(5, 4)
         table.setHorizontalHeaderLabels(["Timeframe", "Role", "State / Signal", "Metrics / Levels"])
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.verticalHeader().setVisible(False)
 
         mtf_data = [
@@ -184,5 +184,5 @@ class MarketPage(QWidget):
             std20 = df["close"].rolling(20).std().values
             upper = sma20 + 2 * std20
             lower = sma20 - 2 * std20
-            self.plot_widget.plot(x, upper, pen=pg.mkPen(color="#7889A4", width=1, style=Qt.DashLine))
-            self.plot_widget.plot(x, lower, pen=pg.mkPen(color="#7889A4", width=1, style=Qt.DashLine))
+            self.plot_widget.plot(x, upper, pen=pg.mkPen(color="#7889A4", width=1, style=Qt.PenStyle.DashLine))
+            self.plot_widget.plot(x, lower, pen=pg.mkPen(color="#7889A4", width=1, style=Qt.PenStyle.DashLine))

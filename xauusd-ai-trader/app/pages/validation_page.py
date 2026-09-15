@@ -45,7 +45,7 @@ class ValidationPage(QWidget):
         table_wf.setHorizontalHeaderLabels([
             "Fold #", "Train Period", "OOS Test Period", "OOS Trades", "OOS Accuracy", "Net OOS Return", "Status"
         ])
-        table_wf.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        table_wf.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table_wf.verticalHeader().setVisible(False)
 
         folds_data = [

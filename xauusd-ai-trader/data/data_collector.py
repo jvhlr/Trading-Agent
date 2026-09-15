@@ -109,10 +109,10 @@ def collect_historical(
     )
 
     # Fetch from MT5
-    rates = mt5.copy_rates_range(broker_symbol, mt5_timeframe, start, end)
+    rates = mt5.copy_rates_range(broker_symbol, mt5_timeframe, start, end)  # type: ignore
 
     if rates is None or len(rates) == 0:
-        error = mt5.last_error() if MT5_AVAILABLE else "MT5 not available"
+        error = mt5.last_error() if MT5_AVAILABLE else "MT5 not available"  # type: ignore
         logger.error("No data returned for %s %s: %s", broker_symbol, timeframe, error)
         return None, None
 

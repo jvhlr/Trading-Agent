@@ -66,7 +66,7 @@ class PaperTradingPage(QWidget):
         table_pt.setHorizontalHeaderLabels([
             "Timestamp", "Signal", "Model Conf", "Entry Price", "SL", "TP", "Position Size", "Paper P&L ($)"
         ])
-        table_pt.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        table_pt.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table_pt.verticalHeader().setVisible(False)
 
         paper_trades = [

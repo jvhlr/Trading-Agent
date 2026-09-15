@@ -41,6 +41,7 @@ class DataFetchWorker(QThread):
                     end = datetime.now(timezone.utc)
                     start = end - timedelta(days=self.days)
                     df, meta = collect_historical(
+                        connector=connector,
                         broker_symbol=broker_symbol,
                         timeframe=self.timeframe,
                         start=start,

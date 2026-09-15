@@ -37,7 +37,7 @@ class MemoryPage(QWidget):
         table_mem.setHorizontalHeaderLabels([
             "Similarity Score", "Historical Date", "Market Regime", "Macro Context", "Forward 24h Return", "MFE ($)", "MAE ($)"
         ])
-        table_mem.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        table_mem.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table_mem.verticalHeader().setVisible(False)
 
         mem_data = [

@@ -71,7 +71,7 @@ class RiskPage(QWidget):
         table_risk.setHorizontalHeaderLabels([
             "Timestamp (UTC)", "Proposed Action", "Proposed Lot Size", "Rejection Reason", "Engine Status"
         ])
-        table_risk.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        table_risk.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table_risk.verticalHeader().setVisible(False)
 
         rejections = [

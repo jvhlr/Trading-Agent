@@ -19,7 +19,7 @@ class DecisionPipelinePage(QWidget):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll_content = QWidget()
         s_layout = QVBoxLayout(scroll_content)
 

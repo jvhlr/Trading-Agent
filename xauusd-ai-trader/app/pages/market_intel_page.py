@@ -76,7 +76,7 @@ class MarketIntelPage(QWidget):
         t_macro.setHorizontalHeaderLabels([
             "Release Time (UTC)", "Event Name", "Country", "Previous", "Forecast", "Actual", "Gold Impact"
         ])
-        t_macro.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        t_macro.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         t_macro.verticalHeader().setVisible(False)
 
         macro_data = [

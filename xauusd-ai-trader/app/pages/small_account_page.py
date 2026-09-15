@@ -68,9 +68,11 @@ class SmallAccountPage(QWidget):
     def _calculate_feasibility(self):
         # Clear old items
         for i in reversed(range(self.res_layout.count())):
-            w = self.res_layout.itemAt(i).widget()
-            if w:
-                w.deleteLater()
+            item = self.res_layout.itemAt(i)
+            if item is not None:
+                w = item.widget()
+                if w:
+                    w.deleteLater()
 
         text_bal = self.combo_bal.currentText().split()[0].replace("$", "").replace(",", "")
         balance = float(text_bal)

@@ -47,6 +47,8 @@ class MacroFetchWorker(QThread):
                             
                         chg_pct = ((curr_close - prev_close) / prev_close) * 100
                         chg_val = curr_close - prev_close
+                        val_str = f"{curr_close:.2f}"
+                        chg_str = f"{chg_pct:+.2f}%"
                         
                         # Formatting based on instrument type
                         if key in ["US10Y", "US2Y"]:

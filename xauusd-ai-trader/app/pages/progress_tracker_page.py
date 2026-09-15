@@ -28,7 +28,7 @@ class ProgressTrackerPage(QWidget):
         table_prog.setHorizontalHeaderLabels([
             "Phase #", "Milestone Name", "Prerequisites", "Status"
         ])
-        table_prog.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        table_prog.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table_prog.verticalHeader().setVisible(False)
 
         phases = [

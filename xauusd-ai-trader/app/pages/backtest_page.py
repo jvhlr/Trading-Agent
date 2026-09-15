@@ -108,7 +108,7 @@ class BacktestPage(QWidget):
         self.plot_widget.showGrid(x=True, y=True, alpha=0.2)
         self.plot_widget.setLabel("left", "Account Equity ($)")
         self.plot_widget.setLabel("bottom", "Trade Number")
-        p_layout.addWidget(self.plot_widget)
+        p_layout.addWidget(self.plot_widget)  # type: ignore
 
         layout.addWidget(plot_card, stretch=2)
 

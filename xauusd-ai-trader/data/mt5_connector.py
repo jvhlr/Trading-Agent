@@ -35,15 +35,15 @@ except ImportError:
 TIMEFRAME_MAP: dict[str, int] = {}
 if MT5_AVAILABLE:
     TIMEFRAME_MAP = {
-        "M1": mt5.TIMEFRAME_M1,
-        "M5": mt5.TIMEFRAME_M5,
-        "M15": mt5.TIMEFRAME_M15,
-        "M30": mt5.TIMEFRAME_M30,
-        "H1": mt5.TIMEFRAME_H1,
-        "H4": mt5.TIMEFRAME_H4,
-        "D1": mt5.TIMEFRAME_D1,
-        "W1": mt5.TIMEFRAME_W1,
-        "MN1": mt5.TIMEFRAME_MN1,
+        "M1": mt5.TIMEFRAME_M1,  # type: ignore
+        "M5": mt5.TIMEFRAME_M5,  # type: ignore
+        "M15": mt5.TIMEFRAME_M15,  # type: ignore
+        "M30": mt5.TIMEFRAME_M30,  # type: ignore
+        "H1": mt5.TIMEFRAME_H1,  # type: ignore
+        "H4": mt5.TIMEFRAME_H4,  # type: ignore
+        "D1": mt5.TIMEFRAME_D1,  # type: ignore
+        "W1": mt5.TIMEFRAME_W1,  # type: ignore
+        "MN1": mt5.TIMEFRAME_MN1,  # type: ignore
     }
 
 
@@ -139,14 +139,14 @@ class MT5Connector:
 
         logger.info("Attempting MT5 connection (server=%s, login=%s)...", self.server, self.login)
 
-        if not mt5.initialize(**init_kwargs):
-            error = mt5.last_error()
+        if not mt5.initialize(**init_kwargs):  # type: ignore
+            error = mt5.last_error()  # type: ignore
             logger.error("MT5 initialization failed: %s", error)
             self._connected = False
             return False
 
         # Log terminal info
-        terminal_info = mt5.terminal_info()
+        terminal_info = mt5.terminal_info()  # type: ignore
         if terminal_info:
             logger.info(
                 "MT5 connected — company=%s, build=%s, connected=%s",
@@ -161,7 +161,7 @@ class MT5Connector:
     def disconnect(self) -> None:
         """Cleanly shut down the MT5 connection."""
         if MT5_AVAILABLE and self._connected:
-            mt5.shutdown()
+            mt5.shutdown()  # type: ignore
             self._connected = False
             logger.info("MT5 connection closed.")
 
@@ -187,7 +187,7 @@ class MT5Connector:
         seen_names: set[str] = set()
 
         for pattern in search_patterns:
-            symbols = mt5.symbols_get(pattern)
+            symbols = mt5.symbols_get(pattern)  # type: ignore
             if symbols is None:
                 continue
             for sym in symbols:
@@ -211,7 +211,7 @@ class MT5Connector:
                 ))
 
         # Also search by description keywords
-        all_symbols = mt5.symbols_get()
+        all_symbols = mt5.symbols_get()  # type: ignore
         if all_symbols:
             for sym in all_symbols:
                 if sym.name in seen_names:
@@ -255,7 +255,7 @@ class MT5Connector:
             logger.error("Cannot get symbol info: not connected to MT5.")
             return None
 
-        info = mt5.symbol_info(symbol_name)
+        info = mt5.symbol_info(symbol_name)  # type: ignore
         if info is None:
             logger.warning("Symbol '%s' not found on broker.", symbol_name)
             return None

@@ -86,14 +86,14 @@ class BacktestWorker(QThread):
             fast_sma_idx = feature_cols.index("sma_20") if "sma_20" in feature_cols else 0
             slow_sma_idx = feature_cols.index("sma_50") if "sma_50" in feature_cols else 1
 
-            models = [
-                RandomBaseline(weighted=True, seed=42),
-                MajorityWaitBaseline(),
-                PreviousReturnMomentumBaseline(return_feature_idx=return_idx),
-                SMACrossoverBaseline(fast_sma_idx=fast_sma_idx, slow_sma_idx=slow_sma_idx),
-                LogisticRegressionModel(C=0.1, random_state=42),
-                RandomForestModel(n_estimators=100, max_depth=4, random_state=42),
-                GradientBoostingModel(n_estimators=100, learning_rate=0.03, max_depth=3, random_state=42),
+            model_factories = [
+                lambda: RandomBaseline(weighted=True, seed=42),
+                lambda: MajorityWaitBaseline(),
+                lambda: PreviousReturnMomentumBaseline(return_feature_idx=return_idx),
+                lambda: SMACrossoverBaseline(fast_sma_idx=fast_sma_idx, slow_sma_idx=slow_sma_idx),
+                lambda: LogisticRegressionModel(C=0.1, random_state=42),
+                lambda: RandomForestModel(n_estimators=100, max_depth=4, random_state=42),
+                lambda: GradientBoostingModel(n_estimators=100, learning_rate=0.03, max_depth=3, random_state=42),
             ]
 
             config = BacktestConfig(
@@ -105,28 +105,29 @@ class BacktestWorker(QThread):
 
             results = []
             sample_equity_curves = []
-            total_models = len(models)
+            total_models = len(model_factories)
 
-            for idx, model in enumerate(models):
+            for idx, m_factory in enumerate(model_factories):
+                sample_model = m_factory()
                 prog = int(40 + (idx / total_models) * 55)
-                self.progress_signal.emit(f"Running Walk-Forward CV ({model.name})...", prog)
+                self.progress_signal.emit(f"Running Walk-Forward CV ({sample_model.name})...", prog)
 
                 wf_result = run_walk_forward(
                     df=df,
-                    model=model,
                     feature_cols=feature_cols,
-                    n_folds=self.n_folds,
+                    target_col="target_binary",
+                    model_factory=m_factory,
                     config=config,
                 )
 
                 results.append({
-                    "model_name": model.name,
-                    "folds_tested": wf_result.n_folds,
+                    "model_name": wf_result.model_name,
+                    "folds_tested": wf_result.total_folds,
                     "passed_folds": wf_result.passed_folds,
-                    "total_trades": wf_result.total_trades,
-                    "win_rate": wf_result.win_rate,
-                    "net_return_pct": wf_result.overall_net_return_pct,
-                    "profit_factor": wf_result.overall_profit_factor,
+                    "total_trades": wf_result.total_oos_trades,
+                    "win_rate": wf_result.aggregate_win_rate,
+                    "net_return_pct": wf_result.aggregate_net_return_pct,
+                    "profit_factor": wf_result.aggregate_profit_factor,
                 })
 
             self.progress_signal.emit("Walk-Forward Backtest complete.", 100)

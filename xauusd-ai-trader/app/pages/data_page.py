@@ -63,7 +63,7 @@ class DataPage(QWidget):
         table_sym.setHorizontalHeaderLabels([
             "Broker Candidate", "Description", "Digits", "Point", "Tick Size", "Tick Value", "Status"
         ])
-        table_sym.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        table_sym.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table_sym.verticalHeader().setVisible(False)
 
         candidates = [
@@ -93,7 +93,7 @@ class DataPage(QWidget):
         self.table_qc.setHorizontalHeaderLabels([
             "Validation Rule", "Status", "Issue Count", "Details"
         ])
-        self.table_qc.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table_qc.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table_qc.verticalHeader().setVisible(False)
 
         self.table_qc.setRowCount(0)
@@ -123,11 +123,11 @@ class DataPage(QWidget):
             # Color status
             status_item = QTableWidgetItem(status)
             if status == "PASS" or status == "INFO":
-                status_item.setForeground(Qt.green)
+                status_item.setForeground(Qt.GlobalColor.green)
             elif status == "WARNING":
-                status_item.setForeground(Qt.yellow)
+                status_item.setForeground(Qt.GlobalColor.yellow)
             else:
-                status_item.setForeground(Qt.red)
+                status_item.setForeground(Qt.GlobalColor.red)
                 
             self.table_qc.setItem(r, 1, status_item)
             self.table_qc.setItem(r, 2, QTableWidgetItem(str(check.count)))

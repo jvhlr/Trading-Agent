@@ -27,7 +27,7 @@ class OverviewPage(QWidget):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll_content = QWidget()
         layout = QVBoxLayout(scroll_content)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -146,8 +146,8 @@ class OverviewPage(QWidget):
         self.lbl_dec.setStyleSheet("font-size: 32px; font-weight: 800; color: #FFAB00;")
         self.lbl_dec_sub = QLabel("Action: No position authorized")
         self.lbl_dec_sub.setStyleSheet("color: #C5D1E0; font-size: 12px;")
-        dec_box_layout.addWidget(self.lbl_dec, alignment=Qt.AlignCenter)
-        dec_box_layout.addWidget(self.lbl_dec_sub, alignment=Qt.AlignCenter)
+        dec_box_layout.addWidget(self.lbl_dec, alignment=Qt.AlignmentFlag.AlignCenter)
+        dec_box_layout.addWidget(self.lbl_dec_sub, alignment=Qt.AlignmentFlag.AlignCenter)
 
         d_row.addWidget(dec_box, stretch=1)
 
@@ -235,7 +235,7 @@ class OverviewPage(QWidget):
         # Clear old reasons
         while self.reasons_box.count() > 1:
             item = self.reasons_box.takeAt(1)
-            if item.widget():
+            if item is not None and item.widget():
                 item.widget().deleteLater()
                 
         if spread > 20:

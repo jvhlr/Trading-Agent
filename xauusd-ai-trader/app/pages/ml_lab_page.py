@@ -91,7 +91,7 @@ class MLLabPage(QWidget):
         self.table_res.setHorizontalHeaderLabels([
             "Model Name", "Accuracy", "Macro F1", "Brier Score", "Trades", "Win Rate", "Net Return", "Profit Factor"
         ])
-        self.table_res.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table_res.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table_res.verticalHeader().setVisible(False)
 
         # Initial benchmark data
