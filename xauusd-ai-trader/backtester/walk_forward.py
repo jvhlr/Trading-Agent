@@ -130,8 +130,8 @@ def run_walk_forward(
         # Predict on Test split (unseen holdout)
         test_preds = model.predict(ds.X_test)
 
-        # Run backtest simulator on Test portion of fold DataFrame
-        test_df = fold_df.iloc[-len(ds.X_test):].reset_index(drop=True)
+        # Run backtest simulator on Test portion of cleaned fold DataFrame
+        test_df = ds.raw_df_cleaned.iloc[-len(ds.X_test):].reset_index(drop=True)
         test_result = run_backtest(test_df, test_preds, config=config)
 
         fold_res = WalkForwardFoldResult(

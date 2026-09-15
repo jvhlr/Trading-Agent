@@ -124,7 +124,7 @@ def run_experiment(
         df,
         feature_cols=feature_cols,
         target_col="target_direction",
-        return_col="return_1",
+        return_col="target_return",
         train_ratio=0.6,
         val_ratio=0.2,
         test_ratio=0.2,

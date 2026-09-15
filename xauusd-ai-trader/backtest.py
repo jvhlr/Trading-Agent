@@ -192,14 +192,14 @@ def run_backtest_terminal(
             df,
             feature_cols=feature_cols,
             target_col="target_direction",
-            return_col="return_1",
+            return_col="target_return",
             train_ratio=0.6,
             val_ratio=0.2,
             test_ratio=0.2,
             scale=True,
         )
 
-        test_df = df.iloc[-len(ds.X_test):].reset_index(drop=True)
+        test_df = ds.raw_df_cleaned.iloc[-len(ds.X_test):].reset_index(drop=True)
         best_model_name = None
         best_net_return = -999.0
 
