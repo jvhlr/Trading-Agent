@@ -36,8 +36,15 @@ class MacroFetchWorker(QThread):
                     data = yf.download(ticker, period="2d", interval="1d", progress=False)
                     
                     if len(data) >= 2:
-                        prev_close = float(data['Close'].iloc[-2])
-                        curr_close = float(data['Close'].iloc[-1])
+                        # yfinance sometimes returns a DataFrame for 'Close' with the ticker as column
+                        close_col = data['Close']
+                        if close_col.ndim > 1:
+                            prev_close = float(close_col.iloc[-2, 0])
+                            curr_close = float(close_col.iloc[-1, 0])
+                        else:
+                            prev_close = float(close_col.iloc[-2])
+                            curr_close = float(close_col.iloc[-1])
+                            
                         chg_pct = ((curr_close - prev_close) / prev_close) * 100
                         chg_val = curr_close - prev_close
                         
