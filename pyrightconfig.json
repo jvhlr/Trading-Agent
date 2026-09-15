@@ -1,0 +1,13 @@
+{
+  "include": [
+    "xauusd-ai-trader",
+    "execution"
+  ],
+  "extraPaths": [
+    "xauusd-ai-trader",
+    "C:/Python313/Lib/site-packages"
+  ],
+  "pythonVersion": "3.13",
+  "pythonPlatform": "Windows",
+  "pythonPath": "C:/Python313/python.exe"
+}
