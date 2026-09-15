@@ -1,0 +1,22 @@
+# XAUUSD AI Trading Research System — V1 Dependencies
+# Phase 0 + Phase 1: Data Foundation
+#
+# MetaTrader5 is listed but only required when connecting to a live MT5 terminal.
+# All other code works without it (graceful fallback).
+
+# Core data processing
+pandas>=2.0
+numpy>=1.24
+
+# Machine learning (Phase 2, but installed now to avoid later disruption)
+scikit-learn>=1.3
+
+# Configuration
+python-dotenv>=1.0
+PyYAML>=6.0
+
+# Testing
+pytest>=7.0
+
+# MT5 connectivity (install when MT5 terminal is available)
+# MetaTrader5>=5.0.45

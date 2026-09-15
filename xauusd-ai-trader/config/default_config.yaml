@@ -1,0 +1,95 @@
+# XAUUSD AI Trading Research System — Default Configuration
+# =========================================================
+# This file contains default parameters for all subsystems.
+# Override via environment variables or a local config file.
+# All values here are safe research defaults. Trading is DISABLED.
+
+# ── System ────────────────────────────────────────────────
+system:
+  environment: "development"
+  log_level: "INFO"
+  live_trading_enabled: false  # NEVER change this to true in config
+
+# ── Symbol Mapping ────────────────────────────────────────
+symbol:
+  internal_symbol: "XAUUSD"
+  broker_symbol: null  # Discovered at runtime via MT5
+  # Known broker naming patterns for gold/USD:
+  gold_search_patterns:
+    - "XAUUSD"
+    - "XAUUSDm"
+    - "XAUUSD.a"
+    - "XAUUSD.i"
+    - "GOLD"
+    - "GOLDm"
+
+# ── MT5 Connection ────────────────────────────────────────
+mt5:
+  # Credentials loaded from .env (MT5_LOGIN, MT5_PASSWORD, MT5_SERVER, MT5_PATH)
+  connection_timeout_seconds: 30
+  retry_attempts: 3
+  retry_delay_seconds: 5
+
+# ── Data Collection ───────────────────────────────────────
+data:
+  timeframes:
+    - "M1"
+    - "M5"
+    - "M15"
+    - "H1"
+    - "H4"
+    - "D1"
+  default_lookback_days: 365  # 1 year of historical data
+  max_lookback_days: 1825     # 5 years maximum
+  storage_path: "data/raw/xauusd_research.db"
+
+# ── Data Validation ───────────────────────────────────────
+validation:
+  max_missing_candle_pct: 5.0       # % of expected candles that can be missing
+  max_duplicate_count: 0            # Zero tolerance for duplicates
+  max_spread_multiplier: 10.0       # Flag spreads > 10x median as abnormal
+  min_price: 100.0                  # XAUUSD below $100 is impossible in modern era
+  max_price: 50000.0                # Upper sanity bound
+
+# ── Feature Engineering ───────────────────────────────────
+features:
+  price:
+    rolling_return_periods: [5, 10, 20]
+    rolling_volatility_periods: [10, 20, 50]
+
+  technical:
+    sma_periods: [20, 50, 200]
+    ema_periods: [12, 26, 50]
+    rsi_period: 14
+    macd_fast: 12
+    macd_slow: 26
+    macd_signal: 9
+    atr_period: 14
+    adx_period: 14
+    bollinger_period: 20
+    bollinger_std: 2.0
+
+  structure:
+    swing_lookback: 5           # Bars to look back for swing detection
+    trend_sma_period: 20        # SMA period for simple trend classification
+
+# ── Phase 0: Research Definition ──────────────────────────
+research:
+  # V1 Primary Prediction Target
+  prediction_target: "direction"           # direction | return | volatility | trade_outcome
+  prediction_timeframe: "H1"               # Timeframe for predictions
+  prediction_horizon: 1                    # Predict next N candles
+  neutral_zone_pips: 5.0                   # Movement < this = FLAT (not a directional signal)
+  # Transaction cost assumptions for research
+  assumed_spread_points: 30                # ~3 pips for XAUUSD
+  assumed_commission_per_lot: 7.0          # USD per round-trip lot
+  assumed_slippage_points: 10              # ~1 pip slippage assumption
+
+  # Evaluation metrics for Phase 2+
+  primary_metric: "expectancy"
+  secondary_metrics:
+    - "profit_factor"
+    - "net_return"
+    - "max_drawdown"
+    - "win_rate"
+    - "calibration"

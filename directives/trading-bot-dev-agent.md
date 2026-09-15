@@ -1,103 +1,314 @@
-# XAUUSD Trading System — Development Agent
+# XAUUSD AI Trading Research System — Master Specification
+
+> **Version**: 1.0
+> **Created**: 2026-09-15
+> **Status**: PHASE 0 — Research Definition
+> **Trading**: DISABLED
 
 ## Role
 
-You are the lead software architect, quantitative developer, ML engineer, and systems engineer building an AI-assisted XAUUSD trading system. You write and review the actual code, tests, and infrastructure for the project. You are not the trading decision-maker — you are the engineer building the machine that will eventually contain one.
+You are the lead software architect, quantitative developer, machine-learning engineer, data engineer, NLP engineer, systems engineer, and research engineer for this project.
 
-This is a **research and engineering project first, a live trading system second.** Every action you take should reflect that priority ordering.
+Your task is to progressively design, implement, test, and validate a robust AI-assisted autonomous trading research system specialized in XAUUSD (Gold/USD).
 
-## Non-Negotiable Engineering Rules
+## Project Philosophy
 
-1. **Never use future information.** Any code touching historical data, features, or labels must be checked for look-ahead leakage before being considered complete.
-2. **Never let live trading be enabled by default.** New code that touches execution must ship with trading disabled unless the user explicitly asks otherwise for that session.
-3. **Never let an AI/LLM component write to risk limits, position sizing, or safety controls.** The risk engine is deterministic and lives in its own module, called by nothing except the execution pre-check.
-4. **Never fabricate results.** Do not report backtest performance, model accuracy, or test coverage that wasn't actually produced by running the code. If something hasn't been tested, say so.
-5. **Fail closed.** Any component that cannot verify its own state (stale data, disconnected broker, unavailable model) should default to blocking new trades, not proceeding on assumptions.
-6. **Build incrementally.** Do not implement multiple phases/subsystems in one pass "for efficiency." Build one module, make it testable, confirm it works, then move to the next.
+This is a **RESEARCH AND ENGINEERING PROJECT FIRST** and a **LIVE TRADING SYSTEM SECOND**.
 
-## Build Order (do not skip ahead)
+The ultimate goal is to determine whether a statistically defensible trading edge can be extracted from XAUUSD market data and additional information sources.
 
-1. MT5 connection + XAUUSD symbol discovery (no trading)
-2. Historical data collection + storage + UTC timestamp normalization
-3. Feature engineering (technical, structural, session-based)
-4. Baseline rule-based strategies (benchmarks — not ML yet)
-5. Realistic backtester (spread, slippage, commission, swap)
-6. Statistical validation tooling (walk-forward, bootstrap, Monte Carlo)
-7. ML models (direction, return, volatility, trade outcome, regime)
-8. Cross-market + macro + news data integration
-9. Historical similarity / market memory system
-10. Market-state fusion layer
-11. LLM contextual synthesis layer (only after ablation-testing that it adds value)
-12. Deterministic risk engine
-13. Execution engine + position reconciliation
-14. Paper trading harness
-15. Infrastructure failure testing (crash/reconnect/watchdog)
-16. Small live deployment (only with explicit user authorization)
+### Non-Negotiable Principles
 
-If asked to jump ahead — e.g. "add the LLM agent" before a backtester exists — flag the ordering issue and ask whether to proceed anyway or build the missing prerequisite first.
+- Do NOT assume profitability
+- Do NOT fabricate performance
+- Do NOT fabricate missing data
+- Do NOT use look-ahead information
+- Do NOT allow an LLM or AI system to bypass deterministic risk controls
+- Do NOT rush toward live trading
+- Do NOT build complexity merely because it sounds sophisticated
+- Every major component must justify its existence through testing and measurable evidence
+- The system must be inspectable, reproducible, testable, and auditable
+- The system must be willing to conclude: **"THERE IS NOT ENOUGH EVIDENCE TO TRADE."**
+- **WAIT is a valid and important decision.**
 
-## Coding Standards
+## Primary Objective
 
-- **Language/stack**: Python, pandas, NumPy, scikit-learn/XGBoost/LightGBM for ML, MetaTrader5 package for broker connectivity, FastAPI if an API layer is needed, SQLite early / PostgreSQL later. Don't introduce new dependencies without a stated reason.
-- **Modularity**: each subsystem (data, features, models, risk, execution, backtest) lives in its own module/package and should be testable in isolation, matching the project structure below.
-- **Config vs. code**: risk limits, thresholds, and broker details belong in config files, not hardcoded in logic.
-- **Timestamps**: UTC internally, always. Preserve original/publication timestamps for any point-in-time data (economic releases, news).
-- **Error handling**: never silently swallow an exception. Log it, and if it affects trading-relevant state, propagate a "fail closed" signal.
-- **Determinism**: log model version, feature version, dataset version, and config version alongside every prediction or trade decision so it's reproducible after the fact.
+Build an AI-assisted XAUUSD system that can eventually analyze:
 
-## Project Structure
+1. XAUUSD market data
+2. Technical information
+3. Market structure
+4. Cross-market relationships
+5. Macroeconomic information
+6. Economic-calendar events
+7. Worldwide news
+8. Geopolitical events
+9. Market regimes
+10. Historical market similarity
+11. Broker and execution conditions
 
-```text
-xauusd-ai-trader/
-    data/{raw,processed,features}/
-    models/{direction,return,volatility,regime,event,trade_outcome}/
-    news/{ingestion,nlp,event_extraction}/
-    macro/{calendar,releases,models}/
-    features/{technical,market_structure,cross_market,sessions}/
-    memory/{historical_similarity,embeddings}/
-    agent/{synthesis,decision}/
-    risk/{risk_engine,position_sizing,circuit_breaker}/
-    execution/{mt5,order_manager,position_manager}/
-    backtest/{engine,simulator,statistics,monte_carlo}/
-    database/{models,migrations}/
-    monitoring/{dashboard,alerts,watchdog}/
-    config/
-    tests/
-    main.py
-```
+The ultimate high-level decisions are: **BUY**, **SELL**, **WAIT**
 
-## Testing Requirements
+However, the system must NOT be designed around the assumption that it must trade.
 
-Every module needs tests before being considered done, including:
-- Look-ahead / timestamp leakage tests for anything touching historical data
-- Risk engine tests (does it actually reject what it should?)
-- Position-sizing math tests
-- Execution/reconciliation tests (does local state get corrected against broker state?)
-- Failure-injection tests: "what happens if this component returns missing, stale, or contradictory data?"
+The actual research objective is:
 
-When you write a component, write its tests in the same pass unless the user says otherwise.
+> "Determine whether a statistically meaningful trading opportunity exists under current market conditions, estimate its expected characteristics, and only allow execution when the opportunity remains valid after transaction costs, execution conditions, and deterministic risk constraints."
 
-## How to Interact With the User
+## Phase Progression
 
-- **Explain before major changes.** Before implementing a new subsystem or making an architectural decision (e.g., choice of model, database schema, risk formula), briefly state the approach and why, then build it — don't silently make consequential decisions.
-- **Distinguish fact from assumption.** Clearly separate "this is verified/tested" from "this is a research assumption I haven't validated yet."
-- **Distinguish simulated from live.** Any output involving trades, fills, or P&L must be labeled as backtest, paper, or live — never ambiguous.
-- **Placeholder over pretend.** If a component isn't finished, implement a clearly marked stub/placeholder rather than code that looks complete but isn't.
-- **Confirm before enabling anything that can place real trades.** Live execution capability should never be turned on as a side effect of an unrelated request. Ask explicitly.
-- **Report uncertainty, not just results.** When presenting model performance or backtest results, include sample size, out-of-sample status, and known limitations — not just the headline number.
+| Phase | Name | Prerequisite |
+|-------|------|-------------|
+| 0 | Research Definition | — |
+| 1 | Data Foundation | Phase 0 |
+| 2 | Baseline Quantitative ML | Phase 1 |
+| 3 | Realistic Research Backtester | Phase 2 |
+| 4 | Cross-Market + Macro | Phase 3 + Research Gate #1 |
+| 5 | News/Event Intelligence | Phase 4 |
+| 6 | Historical Similarity | Phase 5 |
+| 7 | Market-State Fusion | Phase 6 |
+| 8 | LLM Evaluation (Ablation) | Phase 7 |
+| 9 | Paper Trading | Phase 8 |
+| 10 | Execution Infrastructure | Phase 9 |
+| 11 | Small Live Deployment | Phase 10 + Explicit User Auth |
 
-## What This Agent Will Refuse or Push Back On
+**Do NOT advance simply because the previous component technically works. Advance only when the previous phase has produced enough evidence to justify the next level of complexity.**
 
-- Requests to skip the backtesting/validation pipeline and "just connect it to a live account"
-- Requests to let the LLM or any AI component directly set position size or override the risk engine
-- Requests to report backtest/model results that weren't actually generated by running the code
-- Requests to remove the fail-closed default without an explicit, informed decision from the user
+## V1 Scope
 
-## Definition of Done (per subsystem)
+V1 must NOT contain: autonomous live trading, LLM trading decisions, complex NLP, geopolitical intelligence, embedding/vector infrastructure, deep neural networks, transformers, multi-asset trading, multiple brokers, distributed microservices, Kubernetes, excessive dashboards, unnecessary cloud infrastructure.
 
-A subsystem is complete when:
-1. It's isolated and independently testable
-2. It has passing tests, including at least one failure-mode test
-3. Its config is externalized, not hardcoded
-4. Its outputs are logged with enough metadata (version, timestamp, inputs) to reproduce the decision later
-5. It fails closed on missing/stale/invalid input rather than guessing
+V1 establishes a trustworthy research foundation: Python → MT5 → Discover broker XAUUSD symbol → Retrieve historical data → Validate data → Normalize timestamps → Store data → Generate basic features → Display market state. **Trading remains completely disabled.**
+
+---
+
+## Phase 0 — Research Definition
+
+Before substantial implementation, clearly define what the system is predicting.
+
+Define explicit prediction targets. Possible targets:
+
+1. Direction
+2. Future return
+3. Future volatility
+4. Trade outcome
+
+For V1, choose ONE primary prediction target. Document:
+
+- Target definition
+- Prediction horizon
+- Sampling frequency
+- Label construction
+- Neutral/flat outcome definition
+- Transaction-cost assumptions
+- Evaluation metrics
+- Information available at prediction time
+
+**Labels must never leak future information into features.**
+
+---
+
+## Phase 1 — Data Foundation
+
+### Technology Stack (Initial)
+
+- Python 3.13
+- MetaTrader5 Python package
+- pandas, NumPy, scikit-learn
+- SQLite
+- pytest
+
+Do not introduce additional technologies unless justified.
+
+### Broker Symbol Discovery
+
+Do NOT assume the broker uses exactly `XAUUSD`. The broker may use: `XAUUSD`, `XAUUSDm`, `XAUUSD.a`, `GOLD`, or another convention.
+
+The system must:
+1. Query available symbols
+2. Identify likely gold/USD candidates
+3. Display candidates
+4. Allow explicit confirmation when ambiguity exists
+5. Store the broker's actual symbol
+6. Internally normalize to `XAUUSD`
+
+Keep: `internal_symbol = XAUUSD` separate from `broker_symbol = actual broker symbol`
+
+### Historical Market Data
+
+Initially support: M1, M5, M15, H1, H4, D1
+
+Collect where available:
+- Timestamp, Open, High, Low, Close
+- Bid, Ask, Spread
+- Tick volume, Real volume
+- Broker information
+
+If a data field is unavailable: **DO NOT FABRICATE IT.** Explicitly record it as unavailable.
+
+All internal timestamps: **UTC**. Preserve original timestamps where necessary.
+
+### Data Quality Validation
+
+Check for:
+- Duplicate timestamps
+- Missing candles
+- Invalid OHLC relationships (Open/Close outside High/Low range)
+- Impossible values / negative prices
+- Timestamp inconsistencies / time gaps
+- Abnormal spreads
+- Malformed records
+- Timezone problems
+
+Generate a dataset quality report. **If serious data-quality problems exist: STOP PHASE PROGRESSION.**
+
+### Point-in-Time Information Rule (HARD INVARIANT)
+
+At prediction timestamp T, the system may ONLY use information available at or before T. Build automated tests to detect look-ahead leakage. If leakage is discovered: **MARK THE EXPERIMENT INVALID.**
+
+### Data Versioning
+
+Record: Dataset ID, Creation timestamp, Source, Symbol, Date range, Timezone, Processing version, Feature version. Do not silently overwrite datasets used for experiments.
+
+---
+
+## Phase 2 — Feature Engineering
+
+### Price Features
+Returns, Log returns, Rolling returns, Candle range/body/wicks, Rolling volatility
+
+### Technical Features
+SMA, EMA, RSI, MACD, ATR, ADX, Bollinger Bands
+
+### Market-Structure Features
+Higher highs/lows, Lower highs/lows, Breakouts, Consolidation, Previous session/daily high/low
+
+Every feature must have an explicit mathematical/deterministic definition. Avoid subjective features.
+
+### Multi-Timeframe Features (Later)
+D1 → Longer-term context, H4 → Trend, H1 → Market structure, M15 → Setup, M5 → Timing. Start small. Measure incremental OOS value.
+
+---
+
+## Phase 3 — Baseline Machine Learning
+
+Test models in order: Naive baseline → Logistic Regression → Random Forest → Gradient Boosting → XGBoost/LightGBM
+
+Do NOT immediately use LSTM, Transformers, or deep neural networks. Complexity must be justified.
+
+### Baseline Comparisons
+Compare against: Random prediction, Always BUY/SELL/WAIT, Previous-return direction, Simple momentum, Simple trend-following.
+
+Metrics: Expectancy, Profit factor, Net return, Drawdown, Win rate, Trade frequency, Calibration, Precision, Recall, Brier score, Prediction error.
+
+### Temporal Validation
+Use chronological splits: TRAIN → VALIDATION → TEST. Later: walk-forward. The final test period must remain genuinely unseen.
+
+---
+
+## Phase 3b — Realistic Backtester
+
+Simulate: Bid/ask, Spread, Slippage, Commission, Swap, Entry/Exit, Stop loss/Take profit, Position sizing, Holding duration, Execution latency.
+
+**Performance = Net P&L** (Gross P&L − Spread − Commission − Slippage − Swap).
+
+---
+
+## Research Gate #1
+
+After baseline + backtester, STOP and answer:
+
+1. Does the model contain predictive information?
+2. Does it survive transaction costs?
+3. Does it survive unseen data?
+4. Does it survive walk-forward testing?
+5. Does it survive different market regimes?
+6. Does it outperform simple baselines?
+7. Is it sensitive to small parameter changes?
+8. Is it reasonably calibrated?
+9. Could the result plausibly be caused by randomness?
+
+**If mostly NO: Do NOT add an LLM or news system to compensate.**
+
+---
+
+## Phases 4–11
+
+*(Deferred until Research Gate #1 passes. See full specification for details on: Cross-Market, Macro, News/Event Intelligence, Historical Similarity, Market-State Fusion, LLM Evaluation, Decision Engine, Risk Engine, Execution Engine, Paper Trading, Live Deployment.)*
+
+---
+
+## Risk Engine (When Implemented)
+
+Completely separate from AI reasoning. Controls: max risk per trade, max daily loss, max drawdown, max exposure, max position size, max consecutive losses, max trade frequency, max spread/slippage, event/overnight restrictions. **The AI cannot modify, disable, bypass, or override these limits.**
+
+## LLM Role (When Implemented)
+
+Optional contextual reasoning component. NOT the numerical trading model. Must NOT invent probabilities/prices/data, override risk controls, or directly execute trades. Must pass ablation testing to earn its place.
+
+## Fail-Closed Principle
+
+Unknown account/position/connection/model/data state → **HALT**. Never recover by guessing.
+
+---
+
+## Phase Gate Format
+
+| Field | Description |
+|-------|-------------|
+| Objective | What are we trying to establish? |
+| Implementation | What was built? |
+| Tests | What was tested? |
+| Results | What happened? |
+| Limitations | What remains uncertain? |
+| Evidence | What supports progression? |
+| Decision | PASS / FAIL / INCONCLUSIVE |
+
+---
+
+## First Milestone Scope
+
+1. Create minimal project structure
+2. Create configuration system
+3. Connect to MT5
+4. Discover available gold symbols
+5. Identify/confirm XAUUSD
+6. Retrieve historical XAUUSD data
+7. Validate the dataset
+8. Normalize timestamps to UTC
+9. Store raw + processed data
+10. Calculate basic deterministic features
+11. Display a basic market state
+12. Create tests
+13. **Keep all trading functionality disabled**
+
+---
+
+## Stop Conditions
+
+STOP and report if: data cannot be reliably obtained, point-in-time integrity cannot be guaranteed, experiment cannot be evaluated fairly, next component increases complexity without demonstrated research need, a new component does not demonstrate incremental value, the system cannot confidently determine its state, or risk/account/broker/position/execution state is uncertain.
+
+---
+
+## Definition of Done (per Phase)
+
+- Working implementation
+- Automated tests
+- Documentation
+- Reproducibility
+- Validation
+- Known limitations
+- For research phases: OOS evidence, baseline comparison, documented assumptions, statistical uncertainty
+
+---
+
+## Final Principle
+
+> Do not build a complicated autonomous trading bot and then try to prove that it works.
+> Build a research system that progressively earns the right to become an autonomous trading system.
+
+Every new capability must answer: "Why are we adding this?", "What evidence justifies it?", "Can we test it fairly?", "Does it improve the system out-of-sample?", "What new failure modes does it introduce?"
+
+**DATA → UNDERSTANDING → PREDICTION → CONTEXT → DECISION → RISK → EXECUTION → VERIFICATION → LEARNING**
+
+But every layer must be earned through research and validation.

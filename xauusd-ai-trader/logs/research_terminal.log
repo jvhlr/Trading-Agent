@@ -1,0 +1,31 @@
+2026-09-15 23:12:25,082 [INFO] __main__: ============================================================
+2026-09-15 23:12:25,082 [INFO] __main__: XAUUSD Research Terminal starting...
+2026-09-15 23:12:25,083 [INFO] __main__: Trading: DISABLED (system invariant)
+2026-09-15 23:12:25,083 [INFO] __main__: ============================================================
+2026-09-15 23:12:25,084 [INFO] data.data_collector: Generated 519 synthetic H1 candles for development/testing. THIS IS NOT REAL MARKET DATA.
+2026-09-15 23:12:25,088 [INFO] data.data_validator: 
+============================================================
+DATASET QUALITY REPORT
+============================================================
+  Symbol:         XAUUSD
+  Broker Symbol:  SYNTHETIC — NOT FOR RESEARCH
+  Timeframe:      H1
+  Rows:           519
+  Period:         2026-08-17 00:12:00+00:00 → 2026-09-15 14:12:00+00:00
+
+  Checks:
+  [PASS] No duplicate timestamps
+  [PASS] Missing candles within threshold [9 issue(s)] — 1.7% missing (expected ~528, got 519)
+  [PASS] Timestamps monotonically increasing
+  [PASS] Valid OHLC relationships
+  [PASS] Price values within plausible range
+  [PASS] Spread values within normal range — Median spread: 34
+  [PASS] Timestamps are UTC — Timezone: UTC
+
+  VERDICT: GOOD
+============================================================
+2026-09-15 23:12:25,128 [INFO] data.data_store: Database initialized at C:\Users\Jayvee Hilario\OneDrive - Polytechnic University of the Philippines\Desktop\AI Crypto Trading Bot\xauusd-ai-trader\data\raw\xauusd_research.db
+2026-09-15 23:12:25,148 [INFO] data.data_store: Stored 519 candles as dataset d10703a7-d69 (XAUUSD H1 SYNTHETIC — NOT FOR RESEARCH).
+2026-09-15 23:12:25,148 [INFO] __main__: Data stored as dataset d10703a7-d69
+2026-09-15 23:12:25,148 [INFO] __main__: Computing features...
+2026-09-15 23:12:25,176 [INFO] __main__: Features computed. Total columns: 52
