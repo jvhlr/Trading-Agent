@@ -41,7 +41,7 @@ class CollectionMetadata:
     def summary(self) -> str:
         return (
             f"Collection: {self.broker_symbol} ({self.symbol}) {self.timeframe}\n"
-            f"  Period: {self.start_date.isoformat()} → {self.end_date.isoformat()}\n"
+            f"  Period: {self.start_date.isoformat()} -> {self.end_date.isoformat()}\n"
             f"  Rows: {self.row_count}\n"
             f"  Source: {self.source}\n"
             f"  Collected: {self.collection_timestamp.isoformat()}\n"
@@ -103,7 +103,7 @@ def collect_historical(
         end = end.replace(tzinfo=timezone.utc)
 
     logger.info(
-        "Collecting %s %s data: %s → %s",
+        "Collecting %s %s data: %s -> %s",
         broker_symbol, timeframe,
         start.isoformat(), end.isoformat(),
     )

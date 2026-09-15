@@ -238,7 +238,10 @@ def run_backtest_terminal(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Phase 3 Realistic Research Backtester")
-    parser.add_argument("--synthetic", action="store_true", default=True, help="Use synthetic dataset")
+    parser.add_argument(
+        "--real", action="store_true", default=False, help="Use stored real MT5 market data instead of synthetic"
+    )
+    parser.add_argument("--synthetic", action="store_true", default=False, help="Use synthetic dataset")
     parser.add_argument("--days", type=int, default=180, help="Days of data")
     parser.add_argument("--timeframe", type=str, default="H1", help="Candle timeframe")
     parser.add_argument("--spread", type=float, default=0.30, help="Spread in dollars ($/oz)")
@@ -247,8 +250,10 @@ if __name__ == "__main__":
     parser.add_argument("--walk-forward", action="store_true", default=False, help="Run walk-forward CV")
     args = parser.parse_args()
 
+    use_synthetic = not args.real if args.real else True
+
     run_backtest_terminal(
-        synthetic=args.synthetic,
+        synthetic=use_synthetic,
         days=args.days,
         timeframe=args.timeframe,
         spread=args.spread,

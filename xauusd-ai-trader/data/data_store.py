@@ -81,14 +81,15 @@ class DataStore:
     - list_datasets(): List all stored dataset versions
     """
 
-    def __init__(self, db_path: str | Path):
+    def __init__(self, db_path: str | Path | None = None):
         """
         Initialize the data store.
 
         Args:
-            db_path: Path to the SQLite database file. Parent directories
-                     will be created if they don't exist.
+            db_path: Path to the SQLite database file. Defaults to data/raw/xauusd_research.db.
         """
+        if db_path is None:
+            db_path = Path(__file__).resolve().parent / "raw" / "xauusd_research.db"
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
@@ -224,6 +225,17 @@ class DataStore:
         Returns:
             DataFrame with candle data, or empty DataFrame if not found.
         """
+        if not dataset_id:
+            with sqlite3.connect(self.db_path) as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT dataset_id FROM dataset_versions WHERE symbol = ? AND timeframe = ? ORDER BY created_at DESC LIMIT 1",
+                    (symbol, timeframe),
+                )
+                row = cur.fetchone()
+                if row:
+                    dataset_id = row[0]
+
         query = "SELECT timestamp, open, high, low, close, tick_volume, spread, real_volume FROM raw_candles WHERE symbol = ? AND timeframe = ?"
         params: list = [symbol, timeframe]
 

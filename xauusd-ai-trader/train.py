@@ -218,15 +218,21 @@ def run_experiment(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Phase 2 Model Benchmark Terminal")
     parser.add_argument(
-        "--synthetic", action="store_true", default=True, help="Use synthetic data"
+        "--real", action="store_true", default=False, help="Use stored real MT5 market data instead of synthetic"
+    )
+    parser.add_argument(
+        "--synthetic", action="store_true", default=False, help="Use synthetic data"
     )
     parser.add_argument("--days", type=int, default=180, help="Days of historical data")
     parser.add_argument("--timeframe", type=str, default="H1", help="Candle timeframe")
     parser.add_argument("--threshold", type=float, default=0.30, help="Direction target threshold ($)")
     args = parser.parse_args()
 
+    # Default to synthetic unless --real is passed
+    use_synthetic = not args.real if args.real else True
+
     run_experiment(
-        synthetic=args.synthetic,
+        synthetic=use_synthetic,
         days=args.days,
         timeframe=args.timeframe,
         threshold=args.threshold,
