@@ -1,5 +1,7 @@
 """
 Types and Configuration Dataclasses for XAUUSD Research Backtester.
+
+Renamed to backtest_types.py to prevent shadowing Python's standard library 'types' module.
 """
 
 from dataclasses import dataclass, field

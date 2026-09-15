@@ -12,7 +12,7 @@ import pytest
 import numpy as np
 import pandas as pd
 
-from backtester.types import BacktestConfig, ExitReason
+from backtester.backtest_types import BacktestConfig, ExitReason
 from backtester.sim import run_backtest
 
 

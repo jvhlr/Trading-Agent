@@ -11,7 +11,7 @@ Enforces strict zero look-ahead execution invariants:
 from typing import List, Optional
 import pandas as pd
 import numpy as np
-from .types import Trade, BacktestConfig, BacktestResult, ExitReason
+from .backtest_types import Trade, BacktestConfig, BacktestResult, ExitReason
 
 
 def run_backtest(

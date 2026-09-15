@@ -15,7 +15,7 @@ import numpy as np
 
 from models.dataset_builder import build_dataset
 from models.baselines import BaseModel
-from .types import BacktestConfig, BacktestResult, Trade
+from .backtest_types import BacktestConfig, BacktestResult, Trade
 from .sim import run_backtest
 
 

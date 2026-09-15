@@ -1,6 +1,6 @@
 # XAUUSD AI Trading Research System — Backtester Package
 
-from .types import Trade, BacktestConfig, BacktestResult, ExitReason
+from .backtest_types import Trade, BacktestConfig, BacktestResult, ExitReason
 from .sim import run_backtest
 from .walk_forward import run_walk_forward, WalkForwardSummary, WalkForwardFoldResult
 

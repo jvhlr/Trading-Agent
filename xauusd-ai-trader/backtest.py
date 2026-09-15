@@ -30,7 +30,7 @@ from models.classifiers import (
     RandomForestModel,
     GradientBoostingModel,
 )
-from backtester.types import BacktestConfig
+from backtester.backtest_types import BacktestConfig
 from backtester.sim import run_backtest
 from backtester.walk_forward import run_walk_forward
 
