@@ -11,7 +11,7 @@ from data.data_collector import generate_sample_data
 from features.price_features import add_all_price_features
 from features.technical_features import add_all_technical_features
 from features.structure_features import add_all_structure_features
-from features.label_generator import add_direction_target
+from features.label_generator import add_direction_target, add_binary_target
 
 from models.baselines import (
     RandomBaseline,
@@ -68,6 +68,7 @@ class BacktestWorker(QThread):
             df = add_all_technical_features(df)
             df = add_all_structure_features(df)
             df = add_direction_target(df, horizon=1, threshold=0.30)
+            df = add_binary_target(df, horizon=1)
 
             exclude_cols = {
                 "timestamp", "open", "high", "low", "close", "tick_volume", "real_volume",

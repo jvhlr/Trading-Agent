@@ -105,7 +105,7 @@ class DataPage(QWidget):
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
 
-        self.worker = DataFetchWorker(timeframe="H1", days=180, use_synthetic=False)
+        self.worker = DataFetchWorker(timeframe="H1", days=365, use_synthetic=False)
         self.worker.finished_signal.connect(self._on_fetch_finished)
         self.worker.error_signal.connect(self._on_fetch_error)
         self.worker.start()
