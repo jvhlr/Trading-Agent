@@ -1,16 +1,15 @@
-"""
-Market Intelligence (Cross-Market, Macro, & News Events) Page.
-"""
-
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QFrame,
-    QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget
+    QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget, QPushButton, QProgressBar
 )
+from PySide6.QtCore import Qt
 
+from app.workers.macro_worker import MacroFetchWorker
 
 class MarketIntelPage(QWidget):
     def __init__(self):
         super().__init__()
+        self.xm_labels = {}
         self._init_ui()
 
     def _init_ui(self):
@@ -23,24 +22,45 @@ class MarketIntelPage(QWidget):
         # ── Tab 1: Cross-Market Indicators ─────────────────────────────────
         tab_cross = QWidget()
         l_cross = QVBoxLayout(tab_cross)
+        
+        # Add Refresh Button and Progress Bar
+        header_layout = QHBoxLayout()
+        self.btn_refresh = QPushButton("REFRESH MACRO DATA (Yahoo Finance)")
+        self.btn_refresh.clicked.connect(self._start_fetch)
+        self.btn_refresh.setMinimumHeight(40)
+        self.btn_refresh.setStyleSheet("background-color: #00E5FF; color: #0D1117; font-weight: bold; border-radius: 4px;")
+        
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setVisible(False)
+        
+        header_layout.addWidget(self.btn_refresh)
+        header_layout.addWidget(self.progress_bar)
+        l_cross.addLayout(header_layout)
 
         grid_xm = QGridLayout()
-        xm_cards = [
-            ("US DOLLAR INDEX (DXY)", "104.12", "+0.18%", "Inverse correlation to XAUUSD (-0.78)"),
-            ("US 10Y TREASURY YIELD", "4.21%", "-0.02%", "Real yield proxy for opportunity cost"),
-            ("US 2Y TREASURY YIELD", "4.55%", "+0.01%", "Short-term Fed policy rate expectations"),
-            ("CBOE VIX INDEX", "14.85", "-0.45", "Global equity volatility / Safe-haven demand"),
-            ("SILVER (XAGUSD)", "$31.40", "+0.82%", "Gold/Silver Ratio: 136.7"),
-            ("BRENT CRUDE OIL", "$78.50", "+1.12%", "Energy inflation pressure proxy"),
-        ]
-        for idx, (title, val, chg, desc) in enumerate(xm_cards):
+        # Internal Key -> (Title, Description)
+        xm_cards = {
+            "DXY": ("US DOLLAR INDEX (DXY)", "Inverse correlation to XAUUSD (-0.78)"),
+            "US10Y": ("US 10Y TREASURY YIELD", "Real yield proxy for opportunity cost"),
+            "US2Y": ("US 2Y TREASURY YIELD", "Short-term Fed policy rate expectations"),
+            "VIX": ("CBOE VIX INDEX", "Global equity volatility / Safe-haven demand"),
+            "XAG": ("SILVER (XAGUSD)", "Gold/Silver Ratio proxy"),
+            "BRENT": ("BRENT CRUDE OIL", "Energy inflation pressure proxy"),
+        }
+        
+        for idx, (key, (title, desc)) in enumerate(xm_cards.items()):
             card = QFrame()
             card.setProperty("class", "card")
             cl = QVBoxLayout(card)
             cl.addWidget(QLabel(title))
-            v_lbl = QLabel(f"<b>{val}</b> <font color='#00E5FF'>({chg})</font>")
+            
+            # Value label
+            v_lbl = QLabel("<b>N/A</b> <font color='#90A0B7'>(Loading...)</font>")
             v_lbl.setProperty("class", "card-value")
             cl.addWidget(v_lbl)
+            self.xm_labels[key] = v_lbl
+            
             cl.addWidget(QLabel(desc))
             r, c = divmod(idx, 3)
             grid_xm.addWidget(card, r, c)
@@ -76,3 +96,38 @@ class MarketIntelPage(QWidget):
         tabs.addTab(tab_macro, "MACROECONOMIC CALENDAR")
 
         layout.addWidget(tabs)
+        
+        # Trigger an initial fetch
+        self._start_fetch()
+
+    def _start_fetch(self):
+        self.btn_refresh.setEnabled(False)
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setVisible(True)
+        
+        self.worker = MacroFetchWorker()
+        self.worker.finished_signal.connect(self._on_fetch_finished)
+        self.worker.error_signal.connect(self._on_fetch_error)
+        self.worker.start()
+
+    def _on_fetch_finished(self, results):
+        self.progress_bar.setVisible(False)
+        self.btn_refresh.setEnabled(True)
+        
+        for key, data in results.items():
+            if key in self.xm_labels:
+                val = data.get("val", "N/A")
+                chg = data.get("chg", "N/A")
+                
+                # Determine color based on sign
+                color = "#90A0B7"
+                if chg.startswith("+"):
+                    color = "#00E676"
+                elif chg.startswith("-"):
+                    color = "#FF5252"
+                    
+                self.xm_labels[key].setText(f"<b>{val}</b> <font color='{color}'>({chg})</font>")
+
+    def _on_fetch_error(self, err_msg):
+        self.progress_bar.setVisible(False)
+        self.btn_refresh.setEnabled(True)
