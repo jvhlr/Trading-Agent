@@ -4,7 +4,8 @@ Data Foundation & Quality Validation Page.
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QProgressBar
+    QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QProgressBar,
+    QComboBox, QSpinBox
 )
 from PySide6.QtCore import Qt
 
@@ -39,9 +40,22 @@ class DataPage(QWidget):
         b_grid.addWidget(QLabel(" | <b>Broker Company:</b> MetaQuotes Ltd."))
         b_grid.addWidget(QLabel(" | <b>Account Server:</b> MetaQuotes-Demo"))
         b_grid.addWidget(QLabel(" | <b>Leverage:</b> 1:100"))
+
+        b_grid.addWidget(QLabel(" | <b>Timeframe:</b>"))
+        self.tf_combo = QComboBox()
+        self.tf_combo.addItems(["M1", "M5", "M15", "M30", "H1", "H4", "D1"])
+        self.tf_combo.setCurrentText("H1")
+        b_grid.addWidget(self.tf_combo)
+
+        b_grid.addWidget(QLabel(" | <b>Days:</b>"))
+        self.spin_days = QSpinBox()
+        self.spin_days.setRange(1, 3650)
+        self.spin_days.setValue(365)
+        b_grid.addWidget(self.spin_days)
+
         b_grid.addStretch()
 
-        self.btn_fetch = QPushButton("FETCH & STORE LATEST MT5 DATA")
+        self.btn_fetch = QPushButton("FETCH & STORE")
         self.btn_fetch.clicked.connect(self._start_fetch_data)
         b_grid.addWidget(self.btn_fetch)
 
@@ -105,7 +119,9 @@ class DataPage(QWidget):
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
 
-        self.worker = DataFetchWorker(timeframe="H1", days=365, use_synthetic=False)
+        tf = self.tf_combo.currentText()
+        days = self.spin_days.value()
+        self.worker = DataFetchWorker(timeframe=tf, days=days, use_synthetic=False)
         self.worker.finished_signal.connect(self._on_fetch_finished)
         self.worker.error_signal.connect(self._on_fetch_error)
         self.worker.start()
