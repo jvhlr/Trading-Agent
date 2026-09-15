@@ -145,9 +145,10 @@ class BacktestWorker(QThread):
                         if eq is not None and len(eq) > 1:
                             eq_vals = eq.values if hasattr(eq, "values") else eq
                             start_eq = eq_vals[0]
+                            fold_start_equity = model_equity[-1]
                             for val in eq_vals[1:]:
                                 ratio = val / start_eq
-                                model_equity.append(model_equity[-1] * ratio)
+                                model_equity.append(fold_start_equity * ratio)
                 
                 results.append({
                     "model_name": wf_result.model_name,
