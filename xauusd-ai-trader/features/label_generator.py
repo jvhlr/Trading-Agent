@@ -48,9 +48,8 @@ def add_direction_target(
 
     # Mark the last `horizon` rows as NaN because future price is unknown
     target.iloc[-horizon:] = np.nan
-    out["target_return"].iloc[-horizon:] = np.nan
-
     out[target_col] = target
+    out.loc[out.index[-horizon:], "target_return"] = np.nan
     return out
 
 

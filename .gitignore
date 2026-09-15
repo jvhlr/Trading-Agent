@@ -1,0 +1,23 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment and secrets
+.env
+credentials.json
+token.json
+
+# Database files
+*.db
+*.sqlite3
+xauusd-ai-trader/data/raw/
+
+# Temporary and cache folders
+.tmp/
+.pytest_cache/
+*.log
+
+# IDE files
+.vscode/
+.idea/
