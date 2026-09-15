@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradingView Candlestick Chart</title>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background-color: #0D1117;
+            overflow: hidden;
+        }
+        #chart-container {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="chart-container"></div>
+
+    <script>
+        const chartOptions = { 
+            layout: { 
+                textColor: '#90A0B7', 
+                background: { type: 'solid', color: '#0D1117' } 
+            },
+            grid: {
+                vertLines: { color: 'rgba(144, 160, 183, 0.1)' },
+                horzLines: { color: 'rgba(144, 160, 183, 0.1)' }
+            },
+            rightPriceScale: {
+                borderVisible: false,
+            },
+            timeScale: {
+                borderVisible: false,
+                timeVisible: true,
+                rightOffset: 10,
+            },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+            }
+        };
+        
+        const chart = LightweightCharts.createChart(document.getElementById('chart-container'), chartOptions);
+        
+        const candleSeries = chart.addCandlestickSeries({ 
+            upColor: '#00E676', 
+            downColor: '#FF5252', 
+            borderVisible: false,
+            wickUpColor: '#00E676', 
+            wickDownColor: '#FF5252', 
+        });
+
+        // Store overlays so we can update them
+        const overlays = {};
+
+        // Make chart responsive
+        new ResizeObserver(entries => {
+            if (entries.length === 0 || entries[0].target !== document.getElementById('chart-container')) { return; }
+            const newRect = entries[0].contentRect;
+            chart.applyOptions({ height: newRect.height, width: newRect.width });
+        }).observe(document.getElementById('chart-container'));
+
+        /**
+         * data format: {
+         *   candles: [ {time, open, high, low, close}, ... ],
+         *   lines: [
+         *      { name: "sma20", color: "#FFD700", data: [ {time, value}, ... ] },
+         *      ...
+         *   ]
+         * }
+         */
+        function updateData(payload) {
+            if (payload.candles) {
+                candleSeries.setData(payload.candles);
+            }
+            
+            if (payload.lines) {
+                payload.lines.forEach(lineConfig => {
+                    if (!overlays[lineConfig.name]) {
+                        overlays[lineConfig.name] = chart.addLineSeries({
+                            color: lineConfig.color,
+                            lineWidth: lineConfig.width || 1,
+                            lineStyle: lineConfig.style || 0, // 0 Solid, 1 Dotted, 2 Dashed
+                            crosshairMarkerVisible: false,
+                        });
+                    }
+                    overlays[lineConfig.name].setData(lineConfig.data);
+                });
+            }
+            chart.timeScale().fitContent();
+        }
+    </script>
+</body>
+</html>

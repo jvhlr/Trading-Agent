@@ -6,43 +6,16 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QPushButton, QComboBox, QCheckBox, QTableWidget, QTableWidgetItem, QHeaderView
 )
-from PySide6.QtGui import QPainter, QPicture
-from PySide6.QtCore import Qt, QPointF, QRectF
-import pyqtgraph as pg
+from PySide6.QtWebEngineWidgets import QWebEngineView
 import numpy as np
 import pandas as pd
+import json
+import os
 
 from data.data_store import DataStore
 from data.data_collector import generate_sample_data
 
-class CandlestickItem(pg.GraphicsObject):
-    def __init__(self, data: list):
-        super().__init__()
-        self._data = data
-        self.picture = QPicture()
-        self._generate_picture()
-
-    def _generate_picture(self):
-        p = QPainter(self.picture)
-        p.setPen(pg.mkPen('w'))
-        w = 0.3
-        for (t, open_p, close_p, low_p, high_p) in self._data:
-            p.drawLine(QPointF(t, low_p), QPointF(t, high_p))
-            if open_p > close_p:
-                p.setBrush(pg.mkBrush('#FF5252')) # Red for bearish
-            else:
-                p.setBrush(pg.mkBrush('#00E676')) # Green for bullish
-            # PySide6/Qt requires rect to have top-left and size. Since y is inverted in screen coords sometimes, 
-            # we just construct a QRectF from two points.
-            rect = QRectF(QPointF(t - w, open_p), QPointF(t + w, close_p))
-            p.drawRect(rect)
-        p.end()
-
-    def paint(self, painter, option, widget=None):  # type: ignore
-        painter.drawPicture(0, 0, self.picture)
-
-    def boundingRect(self):  # type: ignore
-        return QRectF(self.picture.boundingRect())
+# Removed CandlestickItem
 
 
 class MarketPage(QWidget):
@@ -93,19 +66,18 @@ class MarketPage(QWidget):
 
         layout.addWidget(controls_card)
 
-        # ── 2. PyQtGraph Interactive Chart ─────────────────────────────────
+        # ── 2. TradingView Interactive Chart ─────────────────────────────────
         chart_card = QFrame()
         chart_card.setProperty("class", "card")
         chart_layout = QVBoxLayout(chart_card)
 
-        pg.setConfigOption("background", "#161920")
-        pg.setConfigOption("foreground", "#90A0B7")
+        self.chart_title = QLabel("<b>XAUUSD Gold Spot Price</b>")
+        chart_layout.addWidget(self.chart_title)
 
-        self.plot_widget = pg.PlotWidget(title="XAUUSD Gold Spot Price")
-        self.plot_widget.showGrid(x=True, y=True, alpha=0.2)
-        self.plot_widget.setLabel("left", "Price ($/oz)")
-        self.plot_widget.setLabel("bottom", "Candle Bar Index")
-        chart_layout.addWidget(self.plot_widget)  # type: ignore
+        self.web_view = QWebEngineView()
+        template_path = os.path.join(os.path.dirname(__file__), "..", "templates", "tv_candle.html")
+        self.web_view.load(f"file:///{template_path.replace(chr(92), '/')}")
+        chart_layout.addWidget(self.web_view)
 
         layout.addWidget(chart_card, stretch=3)
 
@@ -145,44 +117,74 @@ class MarketPage(QWidget):
             df, _ = generate_sample_data(timeframe=tf, days=30)
 
         self.current_df = df
-        self.plot_widget.setTitle(f"XAUUSD Gold Spot Price ({tf})")
+        self.chart_title.setText(f"<b>XAUUSD Gold Spot Price ({tf})</b>")
         self._plot_data()
 
     def _plot_data(self):
         if getattr(self, "current_df", None) is None or self.current_df.empty:
             return
 
-        self.plot_widget.clear()
         df = self.current_df.tail(150).reset_index(drop=True)
-        x = np.arange(len(df))
         
-        # Create candlestick data
-        # Format: (time, open, close, low, high)
+        # Use simple integer indices for the x-axis to match how we display the backtest
         candles = []
         for i in range(len(df)):
-            candles.append((
-                i, 
-                df.iloc[i]["open"], 
-                df.iloc[i]["close"], 
-                df.iloc[i]["low"], 
-                df.iloc[i]["high"]
-            ))
-            
-        candlestick = CandlestickItem(candles)
-        self.plot_widget.addItem(candlestick)
+            row = df.iloc[i]
+            # Convert pandas Timestamp to unix timestamp (seconds) if available, otherwise use index
+            time_val = i + 1
+            if "timestamp" in df.columns:
+                time_val = int(row["timestamp"].timestamp())
+                
+            candles.append({
+                "time": time_val,
+                "open": float(row["open"]),
+                "high": float(row["high"]),
+                "low": float(row["low"]),
+                "close": float(row["close"])
+            })
+
+        payload = {
+            "candles": candles,
+            "lines": []
+        }
 
         # SMA Overlays
         if self.chk_sma.isChecked() and len(df) >= 50:
-            sma20 = df["close"].rolling(20).mean().values
-            sma50 = df["close"].rolling(50).mean().values
-            self.plot_widget.plot(x, sma20, pen=pg.mkPen(color="#FFD700", width=1.5), name="SMA 20")
-            self.plot_widget.plot(x, sma50, pen=pg.mkPen(color="#FF5252", width=1.5), name="SMA 50")
+            sma20 = df["close"].rolling(20).mean()
+            sma50 = df["close"].rolling(50).mean()
+            
+            payload["lines"].append({
+                "name": "sma20",
+                "color": "#FFD700",
+                "width": 2,
+                "data": [{"time": c["time"], "value": float(v)} for c, v in zip(candles, sma20) if not pd.isna(v)]
+            })
+            payload["lines"].append({
+                "name": "sma50",
+                "color": "#FF5252",
+                "width": 2,
+                "data": [{"time": c["time"], "value": float(v)} for c, v in zip(candles, sma50) if not pd.isna(v)]
+            })
 
         # Bollinger Bands Overlays
         if self.chk_bb.isChecked() and len(df) >= 20:
-            sma20 = df["close"].rolling(20).mean().values
-            std20 = df["close"].rolling(20).std().values
+            sma20 = df["close"].rolling(20).mean()
+            std20 = df["close"].rolling(20).std()
             upper = sma20 + 2 * std20
             lower = sma20 - 2 * std20
-            self.plot_widget.plot(x, upper, pen=pg.mkPen(color="#7889A4", width=1, style=Qt.PenStyle.DashLine))
-            self.plot_widget.plot(x, lower, pen=pg.mkPen(color="#7889A4", width=1, style=Qt.PenStyle.DashLine))
+            
+            payload["lines"].append({
+                "name": "bb_upper",
+                "color": "#7889A4",
+                "style": 2, # Dashed
+                "data": [{"time": c["time"], "value": float(v)} for c, v in zip(candles, upper) if not pd.isna(v)]
+            })
+            payload["lines"].append({
+                "name": "bb_lower",
+                "color": "#7889A4",
+                "style": 2, # Dashed
+                "data": [{"time": c["time"], "value": float(v)} for c, v in zip(candles, lower) if not pd.isna(v)]
+            })
+
+        json_data = json.dumps(payload)
+        self.web_view.page().runJavaScript(f"updateData({json_data})")

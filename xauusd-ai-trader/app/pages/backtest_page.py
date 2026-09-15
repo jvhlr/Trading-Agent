@@ -6,8 +6,10 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QFrame,
     QPushButton, QDoubleSpinBox, QSpinBox, QTableWidget, QTableWidgetItem, QHeaderView, QProgressBar
 )
-import pyqtgraph as pg
+from PySide6.QtWebEngineWidgets import QWebEngineView
 import numpy as np
+import json
+import os
 
 from app.workers.backtest_worker import BacktestWorker
 
@@ -104,20 +106,18 @@ class BacktestPage(QWidget):
         p_layout = QVBoxLayout(plot_card)
         p_layout.addWidget(QLabel("OUT-OF-SAMPLE EQUITY CURVE ($10,000 STARTING CAPITAL)"))
 
-        self.plot_widget = pg.PlotWidget()
-        self.plot_widget.showGrid(x=True, y=True, alpha=0.2)
-        self.plot_widget.setLabel("left", "Account Equity ($)")
-        self.plot_widget.setLabel("bottom", "Trade Number")
-        p_layout.addWidget(self.plot_widget)  # type: ignore
+        self.web_view = QWebEngineView()
+        # Load local HTML file
+        template_path = os.path.join(os.path.dirname(__file__), "..", "templates", "tv_line.html")
+        self.web_view.load(f"file:///{template_path.replace(chr(92), '/')}")
+        p_layout.addWidget(self.web_view)
 
         layout.addWidget(plot_card, stretch=2)
 
     def _plot_dummy_equity(self):
-        self.plot_widget.clear()
-        np.random.seed(42)
-        returns = np.random.normal(0.003, 0.015, 200)
-        equity = 10000.0 * np.cumprod(1 + returns)
-        self.plot_widget.plot(equity, pen=pg.mkPen(color="#00E5FF", width=2), name="Equity ($)")
+        # We don't plot dummy data here because the webview needs time to load.
+        # It's better to just let it sit blank or display its default state.
+        pass
 
     def _run_backtest(self):
         self.btn_run.setEnabled(False)
@@ -155,10 +155,12 @@ class BacktestPage(QWidget):
             self.metric_labels[2].setText(f"{mdd*100:.2f}%")
             self.metric_labels[3].setText(f"{best['win_rate']*100:.1f}%\n{best['total_trades']} Total Trades Executed")
             
-            self.plot_widget.clear()
             eq_curve = best.get("equity_curve", [])
             if len(eq_curve) > 0:
-                self.plot_widget.plot(eq_curve, pen=pg.mkPen(color="#00E5FF", width=2), name="Best Equity")
+                # Convert to TradingView format
+                tv_data = [{"time": i + 1, "value": round(val, 2)} for i, val in enumerate(eq_curve)]
+                json_data = json.dumps(tv_data)
+                self.web_view.page().runJavaScript(f"updateData({json_data})")
         else:
             self.lbl_status.setText("Status: Walk-Forward Backtest Completed (No Results).")
 
