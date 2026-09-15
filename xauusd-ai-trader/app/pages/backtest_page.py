@@ -144,19 +144,23 @@ class BacktestPage(QWidget):
     def _on_finished(self, results, curves):
         self.progress_bar.setVisible(False)
         self.btn_run.setEnabled(True)
-        self.lbl_status.setText("Status: Walk-Forward Backtest Completed.")
         
         # Find best model
         if results:
             best = max(results, key=lambda x: x["net_return_pct"])
+            self.lbl_status.setText(f"Status: Walk-Forward Backtest Completed. Best Model: {best['model_name']}")
             self.metric_labels[0].setText(f"+{best['net_return_pct']*100:.2f}%")
             self.metric_labels[1].setText(f"{best['profit_factor']:.2f}")
-            self.metric_labels[2].setText("-0.00%") # Placeholder for MDD until computed
-            self.metric_labels[3].setText(f"{best['win_rate']*100:.1f}%")
-        
-        if curves:
+            mdd = best.get("max_drawdown", 0.0)
+            self.metric_labels[2].setText(f"{mdd*100:.2f}%")
+            self.metric_labels[3].setText(f"{best['win_rate']*100:.1f}%\n{best['total_trades']} Total Trades Executed")
+            
             self.plot_widget.clear()
-            self.plot_widget.plot(curves[0], pen=pg.mkPen(color="#00E5FF", width=2), name="Best Equity")
+            eq_curve = best.get("equity_curve", [])
+            if len(eq_curve) > 0:
+                self.plot_widget.plot(eq_curve, pen=pg.mkPen(color="#00E5FF", width=2), name="Best Equity")
+        else:
+            self.lbl_status.setText("Status: Walk-Forward Backtest Completed (No Results).")
 
 
     def _on_error(self, err):

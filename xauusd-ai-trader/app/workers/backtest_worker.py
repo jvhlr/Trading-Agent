@@ -138,6 +138,16 @@ class BacktestWorker(QThread):
                     config=config,
                 )
 
+                model_equity = [10000.0]
+                for fold in wf_result.fold_results:
+                    if fold.test_result and fold.test_result.equity_curve:
+                        eq = fold.test_result.equity_curve
+                        if len(eq) > 1:
+                            start_eq = eq[0]
+                            for val in eq[1:]:
+                                ratio = val / start_eq
+                                model_equity.append(model_equity[-1] * ratio)
+                
                 results.append({
                     "model_name": wf_result.model_name,
                     "folds_tested": wf_result.total_folds,
@@ -146,6 +156,8 @@ class BacktestWorker(QThread):
                     "win_rate": wf_result.aggregate_win_rate,
                     "net_return_pct": wf_result.aggregate_net_return_pct,
                     "profit_factor": wf_result.aggregate_profit_factor,
+                    "max_drawdown": wf_result.max_oos_drawdown_pct,
+                    "equity_curve": model_equity,
                 })
 
             self.progress_signal.emit("Walk-Forward Backtest complete.", 100)
