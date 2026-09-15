@@ -189,3 +189,51 @@ DATASET QUALITY REPORT
 2026-09-16 00:03:17,990 [INFO] __main__: Data stored as dataset 7347eae3-161
 2026-09-16 00:03:17,990 [INFO] __main__: Computing features...
 2026-09-16 00:03:18,039 [INFO] __main__: Features computed. Total columns: 52
+2026-09-16 00:24:35,505 [INFO] __main__: ============================================================
+2026-09-16 00:24:35,506 [INFO] __main__: XAUUSD Research Terminal starting...
+2026-09-16 00:24:35,506 [INFO] __main__: Trading: DISABLED (system invariant)
+2026-09-16 00:24:35,506 [INFO] __main__: ============================================================
+2026-09-16 00:24:35,506 [INFO] data.mt5_connector: Attempting MT5 connection (server=None, login=None)...
+2026-09-16 00:24:35,520 [INFO] data.mt5_connector: MT5 connected — company=MetaQuotes Ltd., build=6194, connected=True
+2026-09-16 00:24:35,655 [INFO] data.mt5_connector: Found 3 gold/USD symbol candidate(s).
+2026-09-16 00:24:35,655 [INFO] data.mt5_connector:   Candidate: XAUUSD               | Gold vs US Dollar                        | digits=2 spread=29 tick_size=0.01 tick_value=0.1
+2026-09-16 00:24:35,655 [INFO] data.mt5_connector:   Candidate: GOLD                 | Barrick Gold Corporation (BC)            | digits=2 spread=0 tick_size=0.01 tick_value=0.01
+2026-09-16 00:24:35,655 [INFO] data.mt5_connector:   Candidate: GTIP                 | Goldman Sachs Access Inflation Protected USD Bond ETF | digits=2 spread=0 tick_size=0.01 tick_value=0.01
+2026-09-16 00:24:35,663 [INFO] __main__: Using broker symbol: XAUUSD
+2026-09-16 00:24:35,663 [INFO] data.data_collector: Collecting XAUUSD H1 data: 2026-08-16T16:24:35.663707+00:00 -> 2026-09-15T16:24:35.663707+00:00
+2026-09-16 00:24:35,664 [INFO] data.data_collector: Received 477 candles from MT5.
+2026-09-16 00:24:35,668 [INFO] data.data_collector: Collection complete.
+Collection: XAUUSD (XAUUSD) H1
+  Period: 2026-08-16T16:24:35.663707+00:00 -> 2026-09-15T16:24:35.663707+00:00
+  Rows: 477
+  Source: MT5
+  Collected: 2026-09-15T16:24:35.668173+00:00
+  Available: timestamp, open, high, low, close, tick_volume, spread, real_volume
+  Unavailable: none
+2026-09-16 00:24:35,668 [INFO] data.mt5_connector: MT5 connection closed.
+2026-09-16 00:24:35,672 [INFO] data.data_validator: 
+============================================================
+DATASET QUALITY REPORT
+============================================================
+  Symbol:         XAUUSD
+  Broker Symbol:  MT5 (XAUUSD)
+  Timeframe:      H1
+  Rows:           477
+  Period:         2026-08-17 01:00:00+00:00 -> 2026-09-15 16:00:00+00:00
+
+  Checks:
+  [PASS] No duplicate timestamps
+  [FAIL (WARNING)] Missing candles within threshold [51 issue(s)] — 9.7% missing (expected ~528, got 477)
+  [PASS] Timestamps monotonically increasing
+  [PASS] Valid OHLC relationships
+  [PASS] Price values within plausible range
+  [PASS] Spread values within normal range — Median spread: 8
+  [PASS] Timestamps are UTC — Timezone: UTC
+
+  VERDICT: WARNING
+============================================================
+2026-09-16 00:24:35,674 [INFO] data.data_store: Database initialized at C:\Users\Jayvee Hilario\OneDrive - Polytechnic University of the Philippines\Desktop\AI Crypto Trading Bot\xauusd-ai-trader\data\raw\xauusd_research.db
+2026-09-16 00:24:35,702 [INFO] data.data_store: Stored 477 candles as dataset 8f85c42d-f5e (XAUUSD H1 MT5 (XAUUSD)).
+2026-09-16 00:24:35,702 [INFO] __main__: Data stored as dataset 8f85c42d-f5e
+2026-09-16 00:24:35,702 [INFO] __main__: Computing features...
+2026-09-16 00:24:35,732 [INFO] __main__: Features computed. Total columns: 52

@@ -83,6 +83,7 @@ class BacktestPage(QWidget):
             ("MAX DRAWDOWN", "-6.82%", "Maximum Peak-to-Trough", "pill-info"),
             ("OOS WIN RATE", "46.9%", "603 Total Trades Executed", "pill-info"),
         ]
+        self.metric_labels = []
         for idx, (title, val, sub, style_cls) in enumerate(m_data):
             card = QFrame()
             card.setProperty("class", "card")
@@ -90,6 +91,7 @@ class BacktestPage(QWidget):
             cl.addWidget(QLabel(title))
             v_lbl = QLabel(val)
             v_lbl.setProperty("class", f"card-value {style_cls}")
+            self.metric_labels.append(v_lbl)
             cl.addWidget(v_lbl)
             cl.addWidget(QLabel(sub))
             metrics_grid.addWidget(card, 0, idx)
@@ -143,6 +145,19 @@ class BacktestPage(QWidget):
         self.progress_bar.setVisible(False)
         self.btn_run.setEnabled(True)
         self.lbl_status.setText("Status: Walk-Forward Backtest Completed.")
+        
+        # Find best model
+        if results:
+            best = max(results, key=lambda x: x["net_return_pct"])
+            self.metric_labels[0].setText(f"+{best['net_return_pct']*100:.2f}%")
+            self.metric_labels[1].setText(f"{best['profit_factor']:.2f}")
+            self.metric_labels[2].setText("-0.00%") # Placeholder for MDD until computed
+            self.metric_labels[3].setText(f"{best['win_rate']*100:.1f}%")
+        
+        if curves:
+            self.plot_widget.clear()
+            self.plot_widget.plot(curves[0], pen=pg.mkPen(color="#00E5FF", width=2), name="Best Equity")
+
 
     def _on_error(self, err):
         self.progress_bar.setVisible(False)
