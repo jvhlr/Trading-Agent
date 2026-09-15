@@ -235,8 +235,10 @@ class OverviewPage(QWidget):
         # Clear old reasons
         while self.reasons_box.count() > 1:
             item = self.reasons_box.takeAt(1)
-            if item is not None and item.widget():
-                item.widget().deleteLater()
+            if item is not None:
+                w = item.widget()
+                if w is not None:
+                    w.deleteLater()
                 
         if spread > 20:
             decision = "WAIT"

@@ -18,7 +18,7 @@ from data.data_collector import generate_sample_data
 class CandlestickItem(pg.GraphicsObject):
     def __init__(self, data: list):
         super().__init__()
-        self.data = data
+        self._data = data
         self.picture = QPicture()
         self._generate_picture()
 
@@ -26,7 +26,7 @@ class CandlestickItem(pg.GraphicsObject):
         p = QPainter(self.picture)
         p.setPen(pg.mkPen('w'))
         w = 0.3
-        for (t, open_p, close_p, low_p, high_p) in self.data:
+        for (t, open_p, close_p, low_p, high_p) in self._data:
             p.drawLine(QPointF(t, low_p), QPointF(t, high_p))
             if open_p > close_p:
                 p.setBrush(pg.mkBrush('#FF5252')) # Red for bearish
