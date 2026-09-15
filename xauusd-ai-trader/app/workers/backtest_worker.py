@@ -106,6 +106,19 @@ class BacktestWorker(QThread):
             results = []
             sample_equity_curves = []
             total_models = len(model_factories)
+            
+            # Dynamic fold sizing for small datasets
+            total_bars = len(df)
+            if total_bars < 1680:
+                train_bars = max(int(total_bars * 0.5), 10)
+                val_bars = max(int(total_bars * 0.15), 5)
+                test_bars = max(int(total_bars * 0.15), 5)
+                step_bars = test_bars
+            else:
+                train_bars = 1200
+                val_bars = 240
+                test_bars = 240
+                step_bars = 240
 
             for idx, m_factory in enumerate(model_factories):
                 sample_model = m_factory()
@@ -117,6 +130,10 @@ class BacktestWorker(QThread):
                     feature_cols=feature_cols,
                     target_col="target_binary",
                     model_factory=m_factory,
+                    train_bars=train_bars,
+                    val_bars=val_bars,
+                    test_bars=test_bars,
+                    step_bars=step_bars,
                     config=config,
                 )
 
