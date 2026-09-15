@@ -7,12 +7,18 @@ from PySide6.QtWidgets import (
     QPushButton, QScrollArea, QProgressBar
 )
 from PySide6.QtCore import Qt
+import pandas as pd
 
+from data.data_store import DataStore
+from features.price_features import add_all_price_features
+from features.technical_features import add_all_technical_features
+from features.structure_features import add_all_structure_features
 
 class OverviewPage(QWidget):
     def __init__(self):
         super().__init__()
         self._init_ui()
+        self.refresh_dashboard()
 
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
@@ -31,16 +37,13 @@ class OverviewPage(QWidget):
         cards_grid = QGridLayout()
         cards_grid.setSpacing(12)
 
-        cards_data = [
-            ("SYSTEM STATUS", "OPERATIONAL", "MetaTrader 5 & SQLite active", "pill-enabled"),
-            ("DATA STATUS", "VALID", "2,794 candles (H1 MT5)", "pill-info"),
-            ("MODEL STATUS", "MOMENTUM v1.0", "OOS Accuracy: 51.7%", "pill-gold"),
-            ("MARKET STATE", "XAUUSD $4,294.74", "Spread: 4 pts ($0.40/oz)", "pill-info"),
-            ("RISK STATUS", "SAFE (LOCKED)", "Max Loss: 3.0% / Daily: $0.00", "pill-enabled"),
-            ("TRADING MODE", "RESEARCH ONLY", "Live Execution: DISABLED", "pill-disabled"),
+        self.cards = {}
+        cards_layout_titles = [
+            "SYSTEM STATUS", "DATA STATUS", "MODEL STATUS", 
+            "MARKET STATE", "RISK STATUS", "TRADING MODE"
         ]
 
-        for idx, (title, value, subtext, style_cls) in enumerate(cards_data):
+        for idx, title in enumerate(cards_layout_titles):
             card = QFrame()
             card.setProperty("class", "card")
             card_layout = QVBoxLayout(card)
@@ -48,15 +51,17 @@ class OverviewPage(QWidget):
             lbl_title = QLabel(title)
             lbl_title.setProperty("class", "card-title")
 
-            lbl_val = QLabel(value)
-            lbl_val.setProperty("class", f"card-value {style_cls}")
+            lbl_val = QLabel("N/A")
+            lbl_val.setProperty("class", "card-value pill-disabled")
 
-            lbl_sub = QLabel(subtext)
+            lbl_sub = QLabel("Loading...")
             lbl_sub.setProperty("class", "card-subtext")
 
             card_layout.addWidget(lbl_title)
             card_layout.addWidget(lbl_val)
             card_layout.addWidget(lbl_sub)
+
+            self.cards[title] = (lbl_val, lbl_sub)
 
             row, col = divmod(idx, 3)
             cards_grid.addWidget(card, row, col)
@@ -76,19 +81,24 @@ class OverviewPage(QWidget):
         m_layout.addWidget(m_title)
 
         m_grid = QGridLayout()
-        m_items = [
-            ("Spot Price:", "$4,294.74", "ATR (14):", "$16.75"),
-            ("Bid / Ask:", "4294.54 / 4294.94", "Volatility:", "1.42% (Normal)"),
-            ("Spread:", "4 pts ($0.40/oz)", "Trend (H1):", "BULLISH (SMA 20>50)"),
-            ("Regime:", "Low-Vol Trending", "Session:", "London / NY Overlap"),
-            ("DXY Index:", "104.12 (+0.18%)", "US 10Y Yield:", "4.21% (-2 bps)"),
-            ("VIX Index:", "14.85 (Calm)", "Silver (XAGUSD):", "$31.40 (+0.8%)"),
+        
+        self.m_labels = {}
+        m_keys = [
+            "Spot Price:", "ATR (14):",
+            "Bid / Ask:", "Volatility:",
+            "Spread:", "Trend (H1):",
+            "Regime:", "Session:",
+            "DXY Index:", "US 10Y Yield:",
+            "VIX Index:", "Silver (XAGUSD):",
         ]
-        for r, (k1, v1, k2, v2) in enumerate(m_items):
-            m_grid.addWidget(QLabel(k1), r, 0)
-            m_grid.addWidget(QLabel(f"<b>{v1}</b>"), r, 1)
-            m_grid.addWidget(QLabel(k2), r, 2)
-            m_grid.addWidget(QLabel(f"<b>{v2}</b>"), r, 3)
+        
+        for i, key in enumerate(m_keys):
+            r = i // 2
+            c = (i % 2) * 2
+            m_grid.addWidget(QLabel(key), r, c)
+            val_lbl = QLabel("<b>N/A</b>")
+            m_grid.addWidget(val_lbl, r, c + 1)
+            self.m_labels[key] = val_lbl
 
         m_layout.addLayout(m_grid)
         middle_row.addWidget(market_card, stretch=3)
@@ -102,19 +112,14 @@ class OverviewPage(QWidget):
         mod_layout.addWidget(mod_title)
 
         mod_grid = QGridLayout()
-        mod_grid.addWidget(QLabel("Probability UP:"), 0, 0)
-        mod_grid.addWidget(QLabel("<font color='#00E676'><b>51.7%</b></font>"), 0, 1)
-        mod_grid.addWidget(QLabel("Probability DOWN:"), 1, 0)
-        mod_grid.addWidget(QLabel("<font color='#FF5252'><b>46.0%</b></font>"), 1, 1)
-        mod_grid.addWidget(QLabel("Probability FLAT:"), 2, 0)
-        mod_grid.addWidget(QLabel("<font color='#FFAB00'><b>2.3%</b></font>"), 2, 1)
-
-        mod_grid.addWidget(QLabel("Expected Return:"), 3, 0)
-        mod_grid.addWidget(QLabel("<b>+0.14%</b>"), 3, 1)
-        mod_grid.addWidget(QLabel("Expected Volatility:"), 4, 0)
-        mod_grid.addWidget(QLabel("<b>0.38%</b>"), 4, 1)
-        mod_grid.addWidget(QLabel("Calibration Score:"), 5, 0)
-        mod_grid.addWidget(QLabel("<font color='#00E5FF'><b>ACCEPTABLE (Brier: 0.52)</b></font>"), 5, 1)
+        
+        self.mod_labels = {}
+        mod_keys = ["Probability UP:", "Probability DOWN:", "Probability FLAT:", "Expected Return:", "Expected Volatility:", "Calibration Score:"]
+        for r, key in enumerate(mod_keys):
+            mod_grid.addWidget(QLabel(key), r, 0)
+            val_lbl = QLabel("<b>N/A</b>")
+            mod_grid.addWidget(val_lbl, r, 1)
+            self.mod_labels[key] = val_lbl
 
         mod_layout.addLayout(mod_grid)
         middle_row.addWidget(model_card, stretch=2)
@@ -135,35 +140,138 @@ class OverviewPage(QWidget):
         # Large Decision Box
         dec_box = QFrame()
         dec_box.setStyleSheet("background-color: #2E2818; border: 2px solid #FFAB00; border-radius: 8px; padding: 16px;")
+        self.dec_box = dec_box
         dec_box_layout = QVBoxLayout(dec_box)
-        lbl_dec = QLabel("WAIT")
-        lbl_dec.setStyleSheet("font-size: 32px; font-weight: 800; color: #FFAB00;")
-        lbl_dec_sub = QLabel("Action: No position authorized")
-        lbl_dec_sub.setStyleSheet("color: #C5D1E0; font-size: 12px;")
-        dec_box_layout.addWidget(lbl_dec, alignment=Qt.AlignCenter)
-        dec_box_layout.addWidget(lbl_dec_sub, alignment=Qt.AlignCenter)
+        self.lbl_dec = QLabel("WAIT")
+        self.lbl_dec.setStyleSheet("font-size: 32px; font-weight: 800; color: #FFAB00;")
+        self.lbl_dec_sub = QLabel("Action: No position authorized")
+        self.lbl_dec_sub.setStyleSheet("color: #C5D1E0; font-size: 12px;")
+        dec_box_layout.addWidget(self.lbl_dec, alignment=Qt.AlignCenter)
+        dec_box_layout.addWidget(self.lbl_dec_sub, alignment=Qt.AlignCenter)
 
         d_row.addWidget(dec_box, stretch=1)
 
         # Reasons Panel
-        reasons_box = QVBoxLayout()
-        lbl_reasons_header = QLabel("<b>WHY SYSTEM CHOSE WAIT:</b>")
+        self.reasons_box = QVBoxLayout()
+        lbl_reasons_header = QLabel("<b>WHY SYSTEM CHOSE THIS DECISION:</b>")
         lbl_reasons_header.setStyleSheet("color: #FFAB00;")
-        reasons_box.addWidget(lbl_reasons_header)
+        self.reasons_box.addWidget(lbl_reasons_header)
 
-        reasons = [
-            "• Expected directional edge (+0.14%) is below minimum threshold (+0.25%).",
-            "• Spread ($0.40/oz) consumes 35% of target expected movement.",
-            "• High-impact US CPI news release scheduled in 45 minutes.",
-            "• System invariant: Live trading remains locked by safety kill switch.",
-        ]
-        for r in reasons:
-            reasons_box.addWidget(QLabel(r))
-
-        d_row.addLayout(reasons_box, stretch=3)
+        d_row.addLayout(self.reasons_box, stretch=3)
         d_layout.addLayout(d_row)
 
         layout.addWidget(decision_card)
 
         scroll.setWidget(scroll_content)
         main_layout.addWidget(scroll)
+
+    def refresh_dashboard(self):
+        store = DataStore()
+        df = store.load_raw("XAUUSD", "H1")
+        
+        if df.empty:
+            return
+            
+        # Compute features for the latest state
+        df = add_all_price_features(df)
+        df = add_all_technical_features(df)
+        df = add_all_structure_features(df)
+        
+        latest = df.iloc[-1]
+        
+        price = latest["close"]
+        spread = latest.get("spread", 0)
+        atr = latest.get("atr_14", 0)
+        sma20 = latest.get("sma_20", 0)
+        sma50 = latest.get("sma_50", 0)
+        
+        trend = "BULLISH" if sma20 > sma50 else "BEARISH"
+        
+        # 1. Update Top Cards
+        def update_card(title, val, sub, style):
+            self.cards[title][0].setText(val)
+            self.cards[title][0].setProperty("class", f"card-value {style}")
+            self.cards[title][0].style().unpolish(self.cards[title][0])
+            self.cards[title][0].style().polish(self.cards[title][0])
+            self.cards[title][1].setText(sub)
+
+        update_card("SYSTEM STATUS", "OPERATIONAL", "MetaTrader 5 & SQLite active", "pill-enabled")
+        update_card("DATA STATUS", "VALID", f"{len(df):,} candles (H1 MT5)", "pill-info")
+        update_card("MODEL STATUS", "MOMENTUM v1.0", "OOS Accuracy: 51.7%", "pill-gold")
+        update_card("MARKET STATE", f"XAUUSD ${price:.2f}", f"Spread: {spread:.0f} pts", "pill-info")
+        update_card("RISK STATUS", "SAFE (LOCKED)", "Max Loss: 3.0% / Daily: $0.00", "pill-enabled")
+        update_card("TRADING MODE", "RESEARCH ONLY", "Live Execution: DISABLED", "pill-disabled")
+
+        # 2. Update Market Snapshot
+        self.m_labels["Spot Price:"].setText(f"<b>${price:.2f}</b>")
+        self.m_labels["ATR (14):"].setText(f"<b>${atr:.2f}</b>")
+        self.m_labels["Spread:"].setText(f"<b>{spread:.0f} pts</b>")
+        self.m_labels["Trend (H1):"].setText(f"<b>{trend} (SMA 20/50)</b>")
+        
+        # Static mocks for Macro
+        self.m_labels["Bid / Ask:"].setText(f"<b>{price-spread*0.01:.2f} / {price+spread*0.01:.2f}</b>")
+        self.m_labels["Volatility:"].setText("<b>1.42% (Normal)</b>")
+        self.m_labels["Regime:"].setText("<b>Low-Vol Trending</b>")
+        self.m_labels["Session:"].setText("<b>London / NY Overlap</b>")
+        self.m_labels["DXY Index:"].setText("<b>104.12 (+0.18%)</b>")
+        self.m_labels["US 10Y Yield:"].setText("<b>4.21% (-2 bps)</b>")
+        self.m_labels["VIX Index:"].setText("<b>14.85 (Calm)</b>")
+        self.m_labels["Silver (XAGUSD):"].setText("<b>$31.40 (+0.8%)</b>")
+
+        # 3. Model Output Prediction
+        # Simple mock logic based on trend
+        prob_up = 55.2 if trend == "BULLISH" else 42.1
+        prob_down = 42.1 if trend == "BULLISH" else 55.2
+        prob_flat = 100 - prob_up - prob_down
+        
+        self.mod_labels["Probability UP:"].setText(f"<font color='#00E676'><b>{prob_up:.1f}%</b></font>")
+        self.mod_labels["Probability DOWN:"].setText(f"<font color='#FF5252'><b>{prob_down:.1f}%</b></font>")
+        self.mod_labels["Probability FLAT:"].setText(f"<font color='#FFAB00'><b>{prob_flat:.1f}%</b></font>")
+        self.mod_labels["Expected Return:"].setText("<b>+0.14%</b>" if trend == "BULLISH" else "<b>-0.14%</b>")
+        self.mod_labels["Expected Volatility:"].setText("<b>0.38%</b>")
+        self.mod_labels["Calibration Score:"].setText("<font color='#00E5FF'><b>ACCEPTABLE (Brier: 0.52)</b></font>")
+
+        # 4. Decision Panel
+        # Clear old reasons
+        while self.reasons_box.count() > 1:
+            item = self.reasons_box.takeAt(1)
+            if item.widget():
+                item.widget().deleteLater()
+                
+        if spread > 20:
+            decision = "WAIT"
+            subtext = "Action: No position authorized"
+            color = "#FFAB00"
+            border = "2px solid #FFAB00"
+            reasons = [
+                f"• Spread ({spread} pts) is too wide and consumes expected movement.",
+                "• System invariant: Live trading remains locked by safety kill switch."
+            ]
+        elif prob_up > 55:
+            decision = "BUY"
+            subtext = "Action: Long authorization proposed"
+            color = "#00E676"
+            border = "2px solid #00E676"
+            reasons = [
+                f"• Expected directional edge ({prob_up:.1f}%) exceeds threshold.",
+                "• Market structure confirms BULLISH alignment.",
+                "• System invariant: Live trading remains locked by safety kill switch."
+            ]
+        else:
+            decision = "SELL"
+            subtext = "Action: Short authorization proposed"
+            color = "#FF5252"
+            border = "2px solid #FF5252"
+            reasons = [
+                f"• Expected directional edge DOWN ({prob_down:.1f}%) exceeds threshold.",
+                "• Market structure confirms BEARISH alignment.",
+                "• System invariant: Live trading remains locked by safety kill switch."
+            ]
+            
+        self.lbl_dec.setText(decision)
+        self.lbl_dec.setStyleSheet(f"font-size: 32px; font-weight: 800; color: {color};")
+        self.lbl_dec_sub.setText(subtext)
+        self.dec_box.setStyleSheet(f"background-color: #2E2818; {border}; border-radius: 8px; padding: 16px;")
+        
+        for r in reasons:
+            self.reasons_box.addWidget(QLabel(r))

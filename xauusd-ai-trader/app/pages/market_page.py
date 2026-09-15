@@ -6,13 +6,43 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QPushButton, QComboBox, QCheckBox, QTableWidget, QTableWidgetItem, QHeaderView
 )
-from PySide6.QtCore import Qt
+from PySide6.QtGui import QPainter, QPicture
+from PySide6.QtCore import Qt, QPointF, QRectF
 import pyqtgraph as pg
 import numpy as np
 import pandas as pd
 
 from data.data_store import DataStore
 from data.data_collector import generate_sample_data
+
+class CandlestickItem(pg.GraphicsObject):
+    def __init__(self, data):
+        super().__init__()
+        self.data = data
+        self.picture = QPicture()
+        self._generate_picture()
+
+    def _generate_picture(self):
+        p = QPainter(self.picture)
+        p.setPen(pg.mkPen('w'))
+        w = 0.3
+        for (t, open_p, close_p, low_p, high_p) in self.data:
+            p.drawLine(QPointF(t, low_p), QPointF(t, high_p))
+            if open_p > close_p:
+                p.setBrush(pg.mkBrush('#FF5252')) # Red for bearish
+            else:
+                p.setBrush(pg.mkBrush('#00E676')) # Green for bullish
+            # PySide6/Qt requires rect to have top-left and size. Since y is inverted in screen coords sometimes, 
+            # we just construct a QRectF from two points.
+            rect = QRectF(QPointF(t - w, open_p), QPointF(t + w, close_p))
+            p.drawRect(rect)
+        p.end()
+
+    def paint(self, p, *args):
+        p.drawPicture(0, 0, self.picture)
+
+    def boundingRect(self):
+        return QRectF(self.picture.boundingRect())
 
 
 class MarketPage(QWidget):
@@ -71,7 +101,7 @@ class MarketPage(QWidget):
         pg.setConfigOption("background", "#161920")
         pg.setConfigOption("foreground", "#90A0B7")
 
-        self.plot_widget = pg.PlotWidget(title="XAUUSD Gold Spot Price (H1)")
+        self.plot_widget = pg.PlotWidget(title="XAUUSD Gold Spot Price")
         self.plot_widget.showGrid(x=True, y=True, alpha=0.2)
         self.plot_widget.setLabel("left", "Price ($/oz)")
         self.plot_widget.setLabel("bottom", "Candle Bar Index")
@@ -115,19 +145,31 @@ class MarketPage(QWidget):
             df, _ = generate_sample_data(timeframe=tf, days=30)
 
         self.current_df = df
+        self.plot_widget.setTitle(f"XAUUSD Gold Spot Price ({tf})")
         self._plot_data()
 
     def _plot_data(self):
-        if not hasattr(self, "current_df") or self.current_df.empty:
+        if getattr(self, "current_df", None) is None or self.current_df.empty:
             return
 
         self.plot_widget.clear()
         df = self.current_df.tail(150).reset_index(drop=True)
         x = np.arange(len(df))
-        close = df["close"].values
-
-        # Price line
-        self.plot_widget.plot(x, close, pen=pg.mkPen(color="#00E5FF", width=2), name="Close Price")
+        
+        # Create candlestick data
+        # Format: (time, open, close, low, high)
+        candles = []
+        for i in range(len(df)):
+            candles.append((
+                i, 
+                df.iloc[i]["open"], 
+                df.iloc[i]["close"], 
+                df.iloc[i]["low"], 
+                df.iloc[i]["high"]
+            ))
+            
+        candlestick = CandlestickItem(candles)
+        self.plot_widget.addItem(candlestick)
 
         # SMA Overlays
         if self.chk_sma.isChecked() and len(df) >= 50:

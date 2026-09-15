@@ -96,22 +96,7 @@ class DataPage(QWidget):
         self.table_qc.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table_qc.verticalHeader().setVisible(False)
 
-        qc_rules = [
-            ("Duplicate Timestamps", "PASS", "0", "Monotonically increasing timestamps verified"),
-            ("Missing Candles", "WARNING", "302 (9.8%)", "Expected ~3,096 H1 candles, received 2,794 (weekend gaps)"),
-            ("Valid OHLC Relationships", "PASS", "0", "All High >= Open/Close and Low <= Open/Close"),
-            ("Plausible Price Range", "PASS", "0", "All prices within valid XAUUSD range ($1000 - $6000)"),
-            ("Abnormal Spread Spikes", "WARNING", "1", "1 candle with spread > 10.0x median (median 4 pts)"),
-            ("Timestamp Timezone", "PASS", "0", "All timestamps strictly normalized to UTC"),
-            ("Field Fabrications", "PASS", "0", "No missing values fabricated or padded"),
-        ]
-
-        for r, (rule, status, cnt, det) in enumerate(qc_rules):
-            self.table_qc.setItem(r, 0, QTableWidgetItem(rule))
-            self.table_qc.setItem(r, 1, QTableWidgetItem(status))
-            self.table_qc.setItem(r, 2, QTableWidgetItem(cnt))
-            self.table_qc.setItem(r, 3, QTableWidgetItem(det))
-
+        self.table_qc.setRowCount(0)
         qc_layout.addWidget(self.table_qc)
         layout.addWidget(qc_card)
 
@@ -128,6 +113,25 @@ class DataPage(QWidget):
     def _on_fetch_finished(self, df, report, dataset_id):
         self.progress_bar.setVisible(False)
         self.btn_fetch.setEnabled(True)
+        
+        # Update Table with report checks
+        self.table_qc.setRowCount(len(report.checks))
+        for r, check in enumerate(report.checks):
+            status = "PASS" if check.passed else check.severity.value
+            self.table_qc.setItem(r, 0, QTableWidgetItem(check.name))
+            
+            # Color status
+            status_item = QTableWidgetItem(status)
+            if status == "PASS" or status == "INFO":
+                status_item.setForeground(Qt.green)
+            elif status == "WARNING":
+                status_item.setForeground(Qt.yellow)
+            else:
+                status_item.setForeground(Qt.red)
+                
+            self.table_qc.setItem(r, 1, status_item)
+            self.table_qc.setItem(r, 2, QTableWidgetItem(str(check.count)))
+            self.table_qc.setItem(r, 3, QTableWidgetItem(check.details))
 
     def _on_fetch_error(self, err_msg):
         self.progress_bar.setVisible(False)
