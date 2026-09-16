@@ -103,12 +103,12 @@ class NewsCalendarPage(QWidget):
         panel.setStyleSheet("background-color: #161B22; border: 1px solid #30363D; border-radius: 6px;")
         layout = QVBoxLayout(panel)
         
-        lbl = QLabel("LIVE NLP NEWS SENTIMENT (YFINANCE -> TEXTBLOB)")
+        lbl = QLabel("LIVE NLP NEWS SENTIMENT (FXSTREET RSS -> TEXTBLOB)")
         lbl.setStyleSheet("font-weight: bold; color: #8B949E; border: none;")
         layout.addWidget(lbl)
         
         self.news_table = QTableWidget(0, 4)
-        self.news_table.setHorizontalHeaderLabels(["Time", "Symbol", "Headline", "Sentiment"])
+        self.news_table.setHorizontalHeaderLabels(["Time", "Relevance", "Headline", "Sentiment"])
         self.news_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.news_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.news_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
@@ -173,7 +173,7 @@ class NewsCalendarPage(QWidget):
                 sentiment = row["sentiment"]
                 
                 item_time = QTableWidgetItem(time_str)
-                item_sym = QTableWidgetItem(row["symbol"])
+                item_rel = QTableWidgetItem(row["relevance"])
                 item_title = QTableWidgetItem(row["title"])
                 
                 # Format sentiment
@@ -198,7 +198,7 @@ class NewsCalendarPage(QWidget):
                 font.setBold(True)
                 item_sent.setFont(font)
                 
-                for col_idx, item in enumerate((item_time, item_sym, item_title, item_sent)):
+                for col_idx, item in enumerate((item_time, item_rel, item_title, item_sent)):
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     self.news_table.setItem(i, col_idx, item)
                     

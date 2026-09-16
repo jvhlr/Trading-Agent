@@ -53,7 +53,7 @@ class MarketIntelPage(QWidget):
 
         # Refresh Header
         header_layout = QHBoxLayout()
-        self.btn_refresh = QPushButton("REFRESH MACRO DATA (Yahoo Finance)")
+        self.btn_refresh = QPushButton("REFRESH MACRO DATA (FXStreet)")
         self.btn_refresh.clicked.connect(self._start_fetch)
         self.btn_refresh.setMinimumHeight(38)
         self.btn_refresh.setProperty("class", "primary")

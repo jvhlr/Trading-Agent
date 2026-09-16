@@ -2,7 +2,11 @@
 XAUUSD AI Trading Research System — Macroeconomic & Intermarket Data Collector
 
 Fetches historical and live macroeconomic data (DXY, US10Y, US2Y, TIP, VIX, XAG, BRENT)
-from Yahoo Finance (or synthetic generator in offline/testing mode) and stores it in MacroDataStore.
+from TradingView (primary) or synthetic generator (fallback for offline/testing mode) and stores it in MacroDataStore.
+
+Note: FXStreet is used for news headlines (see news_collector.py). For historical OHLCV
+time-series, TradingView remains the primary source as FXStreet does not expose downloadable
+historical data via RSS or public API.
 """
 
 import logging
@@ -10,7 +14,6 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Optional, Tuple
 import numpy as np
 import pandas as pd
-import yfinance as yf
 
 try:
     from tvDatafeed import TvDatafeed, Interval
@@ -96,46 +99,15 @@ class MacroCollector:
                     logger.info("Successfully fetched %s from TradingView.", key)
                     return df
                 else:
-                    logger.warning("TradingView returned empty data for %s. Falling back to yfinance.", key)
+                    logger.warning("TradingView returned empty data for %s. Falling back to synthetic.", key)
             except Exception as e:
-                logger.warning("Failed to fetch %s from TradingView: %s. Falling back to yfinance.", key, e)
+                logger.warning("Failed to fetch %s from TradingView: %s. Falling back to synthetic.", key, e)
 
-        # Fallback to yfinance
-        try:
-            logger.info("Fetching macro data for %s (%s) via yfinance...", key, ticker)
-            raw = yf.download(ticker, period=period, interval=interval, progress=False)
-            if raw.empty:
-                logger.warning("Empty data returned for %s from yfinance. Falling back to synthetic.", ticker)
-                df = self.generate_synthetic_macro(key, days=730)
-                self.store.store_macro_series(ticker, name, df)
-                return df
-
-            # Flatten multi-index columns if returned by newer yfinance versions
-            df = raw.copy()
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = [c[0].lower() for c in df.columns]
-            else:
-                df.columns = [c.lower() for c in df.columns]
-
-            df = df.reset_index()
-            # Standardize timestamp column name
-            ts_col = "Date" if "Date" in df.columns else ("Datetime" if "Datetime" in df.columns else df.columns[0])
-            df["timestamp"] = pd.to_datetime(df[ts_col], utc=True)
-
-            # Ensure numeric columns
-            for col in ["open", "high", "low", "close", "volume"]:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors="coerce")
-
-            df = df.dropna(subset=["close"]).sort_values("timestamp").reset_index(drop=True)
-            self.store.store_macro_series(ticker, name, df)
-            return df
-
-        except Exception as e:
-            logger.error("Failed to fetch %s from yfinance: %s. Using synthetic fallback.", key, e)
-            df = self.generate_synthetic_macro(key, days=730)
-            self.store.store_macro_series(ticker, name, df)
-            return df
+        # Fallback directly to synthetic (FXStreet does not provide historical OHLCV downloads)
+        logger.warning("TradingView unavailable for %s. Falling back to synthetic data.", key)
+        df = self.generate_synthetic_macro(key, days=730)
+        self.store.store_macro_series(ticker, name, df)
+        return df
 
     def fetch_all_macro_series(self, period: str = "2y", use_synthetic: bool = False) -> Dict[str, pd.DataFrame]:
         """Fetch and store all configured macro series."""
