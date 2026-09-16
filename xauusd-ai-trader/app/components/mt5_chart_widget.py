@@ -167,7 +167,7 @@ class NativeMT5Chart(QWidget):
         from MT5 and surgically updates the cached DataFrame, avoiding a
         full 300-bar re-fetch each cycle.
         """
-        if not self._ensure_mt5() or self._broker_symbol is None:
+        if not self._ensure_mt5() or self._broker_symbol is None or self._mt5_module is None:
             return
         
         mt5 = self._mt5_module
@@ -213,7 +213,7 @@ class NativeMT5Chart(QWidget):
         """Full data load — used on init and timeframe changes."""
         df = pd.DataFrame()
         
-        if self._ensure_mt5() and self._broker_symbol is not None:
+        if self._ensure_mt5() and self._broker_symbol is not None and self._mt5_module is not None:
             mt5 = self._mt5_module
             tf_map = self._timeframe_map or {}
             mt5_tf = tf_map.get(self.current_timeframe, mt5.TIMEFRAME_H1)

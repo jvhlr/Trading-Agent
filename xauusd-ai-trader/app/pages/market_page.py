@@ -186,7 +186,7 @@ class MarketPage(QWidget):
         tf = self.tf_combo.currentText()
         df = pd.DataFrame()
 
-        if self._ensure_mt5() and self._broker_symbol is not None:
+        if self._ensure_mt5() and self._broker_symbol is not None and self._mt5_module is not None:
             mt5 = self._mt5_module
             tf_map = self._timeframe_map or {}
             mt5_tf = tf_map.get(tf, mt5.TIMEFRAME_H1)
@@ -210,7 +210,7 @@ class MarketPage(QWidget):
         High-frequency tick handler (~500ms). Fetches only the last 2 bars
         and surgically patches the cached DataFrame.
         """
-        if not self._ensure_mt5() or self._broker_symbol is None:
+        if not self._ensure_mt5() or self._broker_symbol is None or self._mt5_module is None:
             return
         if self.current_df is None or self.current_df.empty:
             return
@@ -267,7 +267,8 @@ class MarketPage(QWidget):
         candles = []
         if "timestamp" in df.columns:
             df = df.sort_values("timestamp").drop_duplicates(subset=["timestamp"]).reset_index(drop=True)
-            for i, row in df.iterrows():
+            for i in range(len(df)):
+                row = df.iloc[i]
                 ts = row["timestamp"]
                 if hasattr(ts, "timestamp"):
                     time_val = int(ts.timestamp())
@@ -275,7 +276,7 @@ class MarketPage(QWidget):
                     try:
                         time_val = int(pd.to_datetime(ts).timestamp())
                     except Exception:
-                        time_val = int(i + 1)
+                        time_val = i + 1
 
                 candles.append({
                     "time": time_val,
@@ -286,9 +287,10 @@ class MarketPage(QWidget):
                 })
         else:
             df = df.reset_index(drop=True)
-            for i, row in df.iterrows():
+            for i in range(len(df)):
+                row = df.iloc[i]
                 candles.append({
-                    "time": int(i + 1),
+                    "time": i + 1,
                     "open": float(row["open"]),
                     "high": float(row["high"]),
                     "low": float(row["low"]),
