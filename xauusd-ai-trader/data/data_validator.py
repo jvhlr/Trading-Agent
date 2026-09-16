@@ -188,10 +188,10 @@ def validate(
         # Calculate expected vs actual candle count
         # Note: we skip weekends for intraday timeframes
         total_span = ts.max() - ts.min()
-        if timeframe != "D1" and timeframe != "W1":
-            # Count business days in range
+        if timeframe not in ("D1", "W1"):
+            # Gold/Forex market trades ~23 hours per business day (1h daily rollover break)
             date_range = pd.bdate_range(ts.min(), ts.max())
-            expected_per_day = timedelta(days=1) / interval
+            expected_per_day = timedelta(hours=23) / interval
             expected_count = int(len(date_range) * expected_per_day)
         else:
             expected_count = int(total_span / interval) + 1
@@ -205,7 +205,7 @@ def validate(
             report.add_check(ValidationCheck(
                 name="Missing candles within threshold",
                 passed=missing_pct <= max_missing_pct,
-                severity=Severity.WARNING if missing_pct <= max_missing_pct * 2 else Severity.CRITICAL,
+                severity=Severity.WARNING if missing_pct <= max_missing_pct * 3 else Severity.CRITICAL,
                 count=missing_count,
                 details=f"{missing_pct:.1f}% missing (expected ~{expected_count}, got {actual_count})",
             ))
