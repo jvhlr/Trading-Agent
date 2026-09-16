@@ -13,6 +13,7 @@ from .classifiers import (
     RandomForestModel,
     GradientBoostingModel,
 )
+from .macro_gated_model import MacroGatedModel
 from .evaluation import (
     ClassificationMetrics,
     FinancialMetrics,
@@ -31,6 +32,7 @@ __all__ = [
     "LogisticRegressionModel",
     "RandomForestModel",
     "GradientBoostingModel",
+    "MacroGatedModel",
     "ClassificationMetrics",
     "FinancialMetrics",
     "evaluate_classification",

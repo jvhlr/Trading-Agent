@@ -125,6 +125,8 @@ def run_walk_forward(
 
         # Instantiate fresh model and fit on Train split
         model = model_factory()
+        if hasattr(model, "set_feature_names"):
+            model.set_feature_names(feature_cols)
         model.fit(ds.X_train, ds.y_train)
 
         # Predict on Test split (unseen holdout)

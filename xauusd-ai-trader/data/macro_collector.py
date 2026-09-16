@@ -1,0 +1,153 @@
+"""
+XAUUSD AI Trading Research System — Macroeconomic & Intermarket Data Collector
+
+Fetches historical and live macroeconomic data (DXY, US10Y, US2Y, TIP, VIX, XAG, BRENT)
+from Yahoo Finance (or synthetic generator in offline/testing mode) and stores it in MacroDataStore.
+"""
+
+import logging
+from datetime import datetime, timezone, timedelta
+from typing import Dict, Optional, Tuple
+import numpy as np
+import pandas as pd
+import yfinance as yf
+
+from data.macro_data_store import MacroDataStore
+
+logger = logging.getLogger(__name__)
+
+MACRO_TICKER_MAP = {
+    "DXY": {"ticker": "DX-Y.NYB", "name": "US Dollar Index"},
+    "US10Y": {"ticker": "^TNX", "name": "US 10-Year Treasury Yield"},
+    "US02Y": {"ticker": "^IRX", "name": "US Short-Term Rate Proxy"},
+    "TIP": {"ticker": "TIP", "name": "iShares TIPS Bond ETF (Real Yield Proxy)"},
+    "VIX": {"ticker": "^VIX", "name": "CBOE Volatility Index"},
+    "XAG": {"ticker": "SI=F", "name": "Silver Futures (XAGUSD Proxy)"},
+    "BRENT": {"ticker": "BZ=F", "name": "Brent Crude Oil"},
+}
+
+
+class MacroCollector:
+    """
+    Collects macroeconomic and cross-market historical series.
+    """
+
+    def __init__(self, store: Optional[MacroDataStore] = None):
+        self.store = store or MacroDataStore()
+
+    def fetch_macro_series(
+        self,
+        key: str,
+        period: str = "2y",
+        interval: str = "1d",
+        use_synthetic: bool = False,
+    ) -> pd.DataFrame:
+        """
+        Fetch historical series for a single macro asset.
+        """
+        if key not in MACRO_TICKER_MAP:
+            raise ValueError(f"Unknown macro key: {key}. Available: {list(MACRO_TICKER_MAP.keys())}")
+
+        info = MACRO_TICKER_MAP[key]
+        ticker = info["ticker"]
+        name = info["name"]
+
+        if use_synthetic:
+            df = self.generate_synthetic_macro(key, days=730)
+            self.store.store_macro_series(ticker, name, df)
+            return df
+
+        try:
+            logger.info("Fetching macro data for %s (%s)...", key, ticker)
+            raw = yf.download(ticker, period=period, interval=interval, progress=False)
+            if raw.empty:
+                logger.warning("Empty data returned for %s from yfinance. Falling back to synthetic.", ticker)
+                df = self.generate_synthetic_macro(key, days=730)
+                self.store.store_macro_series(ticker, name, df)
+                return df
+
+            # Flatten multi-index columns if returned by newer yfinance versions
+            df = raw.copy()
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = [c[0].lower() for c in df.columns]
+            else:
+                df.columns = [c.lower() for c in df.columns]
+
+            df = df.reset_index()
+            # Standardize timestamp column name
+            ts_col = "Date" if "Date" in df.columns else ("Datetime" if "Datetime" in df.columns else df.columns[0])
+            df["timestamp"] = pd.to_datetime(df[ts_col], utc=True)
+
+            # Ensure numeric columns
+            for col in ["open", "high", "low", "close", "volume"]:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
+
+            df = df.dropna(subset=["close"]).sort_values("timestamp").reset_index(drop=True)
+            self.store.store_macro_series(ticker, name, df)
+            return df
+
+        except Exception as e:
+            logger.error("Failed to fetch %s from yfinance: %s. Using synthetic fallback.", key, e)
+            df = self.generate_synthetic_macro(key, days=730)
+            self.store.store_macro_series(ticker, name, df)
+            return df
+
+    def fetch_all_macro_series(self, period: str = "2y", use_synthetic: bool = False) -> Dict[str, pd.DataFrame]:
+        """Fetch and store all configured macro series."""
+        results = {}
+        for key in MACRO_TICKER_MAP:
+            results[key] = self.fetch_macro_series(key, period=period, use_synthetic=use_synthetic)
+        return results
+
+    @staticmethod
+    def generate_synthetic_macro(key: str, days: int = 730) -> pd.DataFrame:
+        """
+        Generate realistic synthetic macro series for deterministic offline testing.
+        """
+        rng = np.random.default_rng(seed=hash(key) % 2**32)
+        end_time = datetime.now(timezone.utc)
+        start_time = end_time - timedelta(days=days)
+        timestamps = pd.date_range(start_time, end_time, freq="1D", tz=timezone.utc)
+        n = len(timestamps)
+
+        base_values = {
+            "DXY": (103.5, 0.003),
+            "US10Y": (4.25, 0.02),
+            "US02Y": (4.60, 0.02),
+            "TIP": (107.0, 0.004),
+            "VIX": (15.0, 0.05),
+            "XAG": (31.5, 0.015),
+            "BRENT": (82.0, 0.012),
+        }
+        base, vol = base_values.get(key, (100.0, 0.01))
+
+        if key in ("US10Y", "US02Y"):
+            # Mean-reverting yield random walk
+            drift = -0.01 * np.arange(n) / n
+            innovations = rng.normal(0, vol, n)
+            close = np.clip(base + np.cumsum(innovations) + drift, 1.0, 8.0)
+        elif key == "VIX":
+            # Mean-reverting volatility spikes
+            log_vix = np.log(base) + np.cumsum(rng.normal(0, 0.04, n))
+            # Occasional spikes
+            spikes = (rng.uniform(0, 1, n) > 0.95) * rng.exponential(5.0, n)
+            close = np.clip(np.exp(log_vix) + spikes, 10.0, 65.0)
+        else:
+            # Geometric random walk
+            returns = rng.normal(0.0001, vol, n)
+            close = base * np.cumprod(1 + returns)
+
+        open_p = close * (1 + rng.normal(0, 0.002, n))
+        high_p = np.maximum(open_p, close) * (1 + np.abs(rng.normal(0, 0.004, n)))
+        low_p = np.minimum(open_p, close) * (1 - np.abs(rng.normal(0, 0.004, n)))
+        volume = rng.integers(10000, 500000, n).astype(float)
+
+        return pd.DataFrame({
+            "timestamp": timestamps,
+            "open": np.round(open_p, 4),
+            "high": np.round(high_p, 4),
+            "low": np.round(low_p, 4),
+            "close": np.round(close, 4),
+            "volume": volume,
+        })

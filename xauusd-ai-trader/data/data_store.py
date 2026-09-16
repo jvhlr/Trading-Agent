@@ -229,7 +229,7 @@ class DataStore:
             with sqlite3.connect(self.db_path) as conn:
                 cur = conn.cursor()
                 cur.execute(
-                    "SELECT dataset_id FROM dataset_versions WHERE symbol = ? AND timeframe = ? ORDER BY created_at DESC LIMIT 1",
+                    "SELECT dataset_id FROM dataset_versions WHERE symbol = ? AND timeframe = ? ORDER BY row_count DESC, created_at DESC LIMIT 1",
                     (symbol, timeframe),
                 )
                 row = cur.fetchone()

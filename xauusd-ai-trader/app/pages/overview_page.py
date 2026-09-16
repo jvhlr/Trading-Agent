@@ -208,15 +208,31 @@ class OverviewPage(QWidget):
         self.m_labels["Spread:"].setText(f"<b>{spread:.0f} pts</b>")
         self.m_labels["Trend (H1):"].setText(f"<b>{trend} (SMA 20/50)</b>")
         
-        # Static mocks for Macro
+        # Macro indicators
+        dxy_val = latest.get("dxy_close", 103.85)
+        dxy_chg = latest.get("dxy_ret_5d", 0.0018) * 100
+        us10y_val = latest.get("us10y_yield", 4.21)
+        us10y_del = latest.get("us10y_5d_delta", -0.02)
+        vix_val = latest.get("vix_level", 14.85)
+        xag_val = latest.get("xag_close", 31.40)
+        regime_code = int(latest.get("macro_regime_code", 0))
+
+        regime_map = {
+            0: "Neutral / Consolidation",
+            1: "Dollar Surge (Bearish)",
+            2: "Inflation Hedge (Bullish)",
+            3: "Risk-Off Flight (Bullish)",
+        }
+        regime_str = regime_map.get(regime_code, "Neutral")
+
         self.m_labels["Bid / Ask:"].setText(f"<b>{price-spread*0.01:.2f} / {price+spread*0.01:.2f}</b>")
-        self.m_labels["Volatility:"].setText("<b>1.42% (Normal)</b>")
-        self.m_labels["Regime:"].setText("<b>Low-Vol Trending</b>")
+        self.m_labels["Volatility:"].setText(f"<b>{atr/price*100:.2f}% (ATR Normal)</b>")
+        self.m_labels["Regime:"].setText(f"<b>{regime_str}</b>")
         self.m_labels["Session:"].setText("<b>London / NY Overlap</b>")
-        self.m_labels["DXY Index:"].setText("<b>104.12 (+0.18%)</b>")
-        self.m_labels["US 10Y Yield:"].setText("<b>4.21% (-2 bps)</b>")
-        self.m_labels["VIX Index:"].setText("<b>14.85 (Calm)</b>")
-        self.m_labels["Silver (XAGUSD):"].setText("<b>$31.40 (+0.8%)</b>")
+        self.m_labels["DXY Index:"].setText(f"<b>{dxy_val:.2f} ({dxy_chg:+.2f}%)</b>")
+        self.m_labels["US 10Y Yield:"].setText(f"<b>{us10y_val:.2f}% ({us10y_del:+.2f}%)</b>")
+        self.m_labels["VIX Index:"].setText(f"<b>{vix_val:.2f}</b>")
+        self.m_labels["Silver (XAGUSD):"].setText(f"<b>${xag_val:.2f}</b>")
 
         # 3. Model Output Prediction
         # Simple mock logic based on trend

@@ -1,13 +1,14 @@
 """
-Phase 3 Research Backtester & Walk-Forward Validation CLI Terminal.
+Phase 3 & Phase 4 Research Backtester & Walk-Forward Validation CLI Terminal.
 
 Executes realistic trade execution simulation on XAUUSD market data.
-Accounts for bid/ask spread, slippage, risk budgeting, and intra-bar SL/TP.
-Generates Phase 3 Out-Of-Sample Research Gate Verdict.
+Accounts for bid/ask spread, slippage, risk budgeting, intra-bar SL/TP, and macroeconomic regime gating.
+Generates Phase 4 Out-Of-Sample Research Gate Verdict.
 """
 
 import argparse
 import sys
+from pathlib import Path
 import pandas as pd
 import numpy as np
 
@@ -16,6 +17,7 @@ from data.data_validator import validate
 from features.price_features import add_all_price_features
 from features.technical_features import add_all_technical_features
 from features.structure_features import add_all_structure_features
+from features.macro_features import add_all_macro_features
 from features.label_generator import add_direction_target
 
 from models.dataset_builder import build_dataset
@@ -30,6 +32,7 @@ from models.classifiers import (
     RandomForestModel,
     GradientBoostingModel,
 )
+from models.macro_gated_model import MacroGatedModel
 from backtester.backtest_types import BacktestConfig
 from backtester.sim import run_backtest
 from backtester.walk_forward import run_walk_forward
@@ -44,14 +47,16 @@ def run_backtest_terminal(
     slippage: float = 0.10,
     risk_pct: float = 0.01,
     walk_forward: bool = False,
+    include_macro: bool = True,
 ):
-    print("=" * 85)
-    print("  XAUUSD AI TRADER -> PHASE 3 REALISTIC RESEARCH BACKTESTER TERMINAL")
-    print("=" * 85)
+    print("=" * 90)
+    print("  XAUUSD AI TRADER -> PHASE 4 MACRO & INTERMARKET RESEARCH BACKTESTER TERMINAL")
+    print("=" * 90)
     print(f"  Symbol: {symbol} | Timeframe: {timeframe} | Capital: $10,000.00 | Days: {days}")
     print(f"  Cost Settings: Spread=${spread:.2f}/oz | Slippage=${slippage:.2f}/oz | Risk={risk_pct*100:.1f}% per trade")
+    print(f"  Macro Integration: {'ENABLED (DXY, Yields, VIX, XAG, Brent)' if include_macro else 'DISABLED'}")
     print(f"  Mode: {'Walk-Forward Cross-Validation' if walk_forward else 'Single-Split Holdout Backtest'}")
-    print("-" * 85)
+    print("-" * 90)
 
     # 1. Obtain Data
     if synthetic:
@@ -81,6 +86,11 @@ def run_backtest_terminal(
     df = add_all_price_features(df)
     df = add_all_technical_features(df)
     df = add_all_structure_features(df)
+
+    if include_macro:
+        print("[FEATURES] Aligning Macro & Intermarket Features (Strict Zero Look-Ahead)...")
+        df = add_all_macro_features(df, use_synthetic_fallback=True)
+
     df = add_direction_target(df, horizon=1, threshold=0.30, target_col="target_direction")
 
     # Select numerical feature columns
@@ -142,13 +152,30 @@ def run_backtest_terminal(
         ("Gradient Boosting", lambda: GradientBoostingModel(n_estimators=100, learning_rate=0.03, max_depth=3, random_state=42)),
     ]
 
+    if include_macro:
+        # Add Macro-Gated variants
+        model_factories.extend([
+            ("Macro-Gated Momentum", lambda: MacroGatedModel(
+                PreviousReturnMomentumBaseline(return_feature_idx=return_idx),
+                feature_names=feature_cols
+            )),
+            ("Macro-Gated Gradient Boosting", lambda: MacroGatedModel(
+                GradientBoostingModel(n_estimators=100, learning_rate=0.03, max_depth=3, random_state=42),
+                feature_names=feature_cols
+            )),
+            ("Macro-Gated Random Forest", lambda: MacroGatedModel(
+                RandomForestModel(n_estimators=100, max_depth=4, random_state=42),
+                feature_names=feature_cols
+            )),
+        ])
+
     if walk_forward:
         print("\n[WALK-FORWARD BENCHMARK SUMMARY]")
-        print("=" * 110)
+        print("=" * 115)
         print(
-            f"  {'MODEL NAME':<23} | {'FOLDS':<6} | {'PASS FOLDS':<10} | {'OOS TRADES':<10} | {'WIN RATE':<8} | {'NET RETURN':<10} | {'PF':<5}"
+            f"  {'MODEL NAME':<30} | {'FOLDS':<6} | {'PASS FOLDS':<10} | {'OOS TRADES':<10} | {'WIN RATE':<8} | {'NET RETURN':<10} | {'PF':<5}"
         )
-        print("=" * 110)
+        print("=" * 115)
 
         best_model_name = None
         best_net_return = -999.0
@@ -171,23 +198,22 @@ def run_backtest_terminal(
                 best_model_name = name
 
             print(
-                f"  {name:<23} | {summary.total_folds:>6d} | {summary.passed_folds:>10d} | "
+                f"  {name:<30} | {summary.total_folds:>6d} | {summary.passed_folds:>10d} | "
                 f"{summary.total_oos_trades:>10d} | {summary.aggregate_win_rate*100:>7.1f}% | "
                 f"{summary.aggregate_net_return_pct*100:>9.2f}% | {summary.aggregate_profit_factor:>5.2f}"
             )
 
-        print("=" * 110)
+        print("=" * 115)
 
     else:
         # Single Holdout Backtest
         print("\n[SINGLE-SPLIT HOLDOUT BACKTEST SUMMARY]")
-        print("=" * 125)
+        print("=" * 130)
         print(
-            f"  {'MODEL NAME':<23} | {'FINAL EQUITY':<12} | {'NET RETURN':<10} | {'TRADES':<6} | {'WIN RATE':<8} | {'PF':<5} | {'MAX DD':<7} | {'SHARPE':<6}"
+            f"  {'MODEL NAME':<30} | {'FINAL EQUITY':<12} | {'NET RETURN':<10} | {'TRADES':<6} | {'WIN RATE':<8} | {'PF':<5} | {'MAX DD':<7} | {'SHARPE':<6}"
         )
-        print("=" * 125)
+        print("=" * 130)
 
-        # Build chronological dataset split (60% Train, 20% Val, 20% Test)
         ds = build_dataset(
             df,
             feature_cols=feature_cols,
@@ -205,6 +231,8 @@ def run_backtest_terminal(
 
         for name, factory in model_factories:
             model = factory()
+            if hasattr(model, "set_feature_names"):
+                model.set_feature_names(feature_cols)
             model.fit(ds.X_train, ds.y_train)
             test_preds = model.predict(ds.X_test)
 
@@ -215,14 +243,14 @@ def run_backtest_terminal(
                 best_model_name = name
 
             print(
-                f"  {name:<23} | ${result.final_equity:>11.2f} | {result.net_return_pct*100:>9.2f}% | "
+                f"  {name:<30} | ${result.final_equity:>11.2f} | {result.net_return_pct*100:>9.2f}% | "
                 f"{result.n_trades:>6d} | {result.win_rate*100:>7.1f}% | {result.profit_factor:>5.2f} | "
                 f"{result.max_drawdown_pct*100:>6.2f}% | {result.sharpe_ratio:>6.2f}"
             )
 
-        print("=" * 125)
+        print("=" * 130)
 
-    print("\n[RESEARCH GATE #1 VERDICT]")
+    print("\n[RESEARCH GATE #1 & PHASE 4 VERDICT]")
     print(f"  - Top Performing Model: {best_model_name}")
     print(f"  - Net Return (after spread ${spread:.2f} + slippage ${slippage:.2f}): {best_net_return*100:.2f}%")
 
@@ -231,13 +259,13 @@ def run_backtest_terminal(
     else:
         verdict = "INCONCLUSIVE / NO EDGE -- Model does NOT overcome transaction costs and slippage."
 
-    print(f"\n[PHASE 3 VERDICT] {verdict}")
-    print("  Note: Per directive, trading remains completely DISABLED. Waiting for real MT5 historical data.")
-    print("=" * 85 + "\n")
+    print(f"\n[PHASE 4 VERDICT] {verdict}")
+    print("  Note: Per directive, trading remains completely DISABLED. Fail-closed research mode.")
+    print("=" * 90 + "\n")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Phase 3 Realistic Research Backtester")
+    parser = argparse.ArgumentParser(description="Phase 4 Macro Research Backtester")
     parser.add_argument(
         "--real", action="store_true", default=False, help="Use stored real MT5 market data instead of synthetic"
     )
@@ -248,6 +276,7 @@ if __name__ == "__main__":
     parser.add_argument("--slippage", type=float, default=0.10, help="Slippage in dollars ($/oz)")
     parser.add_argument("--risk", type=float, default=0.01, help="Risk fraction per trade (e.g. 0.01)")
     parser.add_argument("--walk-forward", action="store_true", default=False, help="Run walk-forward CV")
+    parser.add_argument("--no-macro", action="store_true", default=False, help="Disable macro features")
     args = parser.parse_args()
 
     use_synthetic = not args.real if args.real else True
@@ -260,4 +289,5 @@ if __name__ == "__main__":
         slippage=args.slippage,
         risk_pct=args.risk,
         walk_forward=args.walk_forward,
+        include_macro=not args.no_macro,
     )
