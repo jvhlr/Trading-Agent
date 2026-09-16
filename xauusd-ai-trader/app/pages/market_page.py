@@ -148,7 +148,7 @@ class MarketPage(QWidget):
         self._plot_data(fit_content=False)
 
     def _plot_data(self, fit_content=False):
-        if getattr(self, "current_df", None) is None or self.current_df.empty:
+        if self.current_df is None or self.current_df.empty:
             return
 
         df = self.current_df.tail(200).copy()
@@ -185,7 +185,7 @@ class MarketPage(QWidget):
                     "close": float(row["close"]),
                 })
 
-        payload = {
+        payload: dict = {
             "candles": candles,
             "lines": []
         }

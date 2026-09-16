@@ -38,18 +38,18 @@ class CandlestickItem(pg.GraphicsObject):
             if open_p > close_p:
                 p.setPen(down_pen)
                 p.setBrush(down_brush)
-                p.drawLine(pg.QtCore.QPointF(t, min_p), pg.QtCore.QPointF(t, max_p))
+                p.drawLine(pg.QtCore.QLineF(t, min_p, t, max_p))
                 p.drawRect(QRectF(t - w, open_p, w * 2, close_p - open_p))
             else:
                 p.setPen(up_pen)
                 p.setBrush(up_brush)
-                p.drawLine(pg.QtCore.QPointF(t, min_p), pg.QtCore.QPointF(t, max_p))
+                p.drawLine(pg.QtCore.QLineF(t, min_p, t, max_p))
                 p.drawRect(QRectF(t - w, open_p, w * 2, close_p - open_p))
                 
         p.end()
 
-    def paint(self, p, *args):
-        p.drawPicture(0, 0, self.picture)
+    def paint(self, painter, option, widget=None):
+        painter.drawPicture(0, 0, self.picture)
 
     def boundingRect(self):
         return QRectF(self.picture.boundingRect())
@@ -62,8 +62,8 @@ class NativeMT5Chart(QWidget):
         self.current_symbol = self.settings.symbol.internal_symbol
         self.current_timeframe = "M1"  # Default to M1
         
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
         
         # Controls
         ctrl_layout = QHBoxLayout()
@@ -83,7 +83,7 @@ class NativeMT5Chart(QWidget):
         ctrl_layout.addWidget(self.cb_tf)
         ctrl_layout.addWidget(self.btn_refresh)
         
-        self.layout.addLayout(ctrl_layout)
+        self.main_layout.addLayout(ctrl_layout)
         
         # Plot
         self.plot_widget = pg.PlotWidget(background='#1A1A1A')
@@ -92,7 +92,7 @@ class NativeMT5Chart(QWidget):
         self.plot_item.getAxis('bottom').setStyle(tickFont=pg.QtGui.QFont("Arial", 8))
         self.plot_item.getAxis('left').setStyle(tickFont=pg.QtGui.QFont("Arial", 8))
         
-        self.layout.addWidget(self.plot_widget)
+        self.main_layout.addWidget(self.plot_widget)
         
         self.candlestick = None
         self.load_data()
