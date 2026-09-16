@@ -158,7 +158,7 @@ def run_backtest_terminal(
 
     if include_macro:
         # Add Macro-Gated variants
-        model_factories.extend([
+        model_factories.extend([  # type: ignore
             ("Macro-Gated Momentum", lambda: MacroGatedModel(
                 PreviousReturnMomentumBaseline(return_feature_idx=return_idx),
                 feature_names=feature_cols

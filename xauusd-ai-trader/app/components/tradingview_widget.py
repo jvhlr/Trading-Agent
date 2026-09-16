@@ -13,11 +13,11 @@ class TradingViewWidget(QWidget):
         self.interval = interval
         self.theme = theme
         
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
         
         self.web_view = QWebEngineView()
-        self.layout.addWidget(self.web_view)
+        self.main_layout.addWidget(self.web_view)
         
         self.load_chart()
 
@@ -84,7 +84,7 @@ class TradingViewWidget(QWidget):
         
         self.web_view.setHtml(html_content, baseUrl=QUrl("https://s3.tradingview.com"))
 
-    def change_symbol(self, new_symbol: str, new_interval: str = None):
+    def change_symbol(self, new_symbol: str, new_interval: str | None = None):
         """Changes the symbol (and optionally interval) and reloads the chart."""
         self.symbol = new_symbol
         if new_interval:
