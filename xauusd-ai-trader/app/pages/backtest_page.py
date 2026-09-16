@@ -2,21 +2,27 @@
 Research Backtester Page.
 """
 
+import json
+import logging
+import os
+from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QFrame,
     QPushButton, QDoubleSpinBox, QSpinBox, QTableWidget, QTableWidgetItem, QHeaderView, QProgressBar
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 import numpy as np
-import json
-import os
 
 from app.workers.backtest_worker import BacktestWorker
+
+logger = logging.getLogger(__name__)
 
 
 class BacktestPage(QWidget):
     def __init__(self):
         super().__init__()
+        self._is_page_loaded = False
+        self._pending_curve = None
         self._init_ui()
         self._plot_dummy_equity()
 
@@ -107,17 +113,30 @@ class BacktestPage(QWidget):
         p_layout.addWidget(QLabel("OUT-OF-SAMPLE EQUITY CURVE ($10,000 STARTING CAPITAL)"))
 
         self.web_view = QWebEngineView()
-        # Load local HTML file
-        template_path = os.path.join(os.path.dirname(__file__), "..", "templates", "tv_line.html")
-        self.web_view.load(f"file:///{template_path.replace(chr(92), '/')}")
+        template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "templates", "tv_line.html"))
+        self.web_view.load(QUrl.fromLocalFile(template_path))
+        self.web_view.loadFinished.connect(self._on_web_view_loaded)
         p_layout.addWidget(self.web_view)
 
         layout.addWidget(plot_card, stretch=2)
 
+    def _on_web_view_loaded(self, ok: bool):
+        self._is_page_loaded = ok
+        if ok and self._pending_curve:
+            self.web_view.page().runJavaScript(f"updateData({self._pending_curve})")
+            self._pending_curve = None
+
+    def _update_chart_data(self, tv_data: list):
+        json_data = json.dumps(tv_data)
+        if self._is_page_loaded:
+            self.web_view.page().runJavaScript(f"updateData({json_data})")
+        else:
+            self._pending_curve = json_data
+
     def _plot_dummy_equity(self):
-        # We don't plot dummy data here because the webview needs time to load.
-        # It's better to just let it sit blank or display its default state.
-        pass
+        # Provide baseline equity at starting capital
+        baseline_points = [{"time": i + 1, "value": 10000.0} for i in range(20)]
+        self._update_chart_data(baseline_points)
 
     def _run_backtest(self):
         self.btn_run.setEnabled(False)
@@ -157,13 +176,10 @@ class BacktestPage(QWidget):
             
             eq_curve = best.get("equity_curve", [])
             if len(eq_curve) > 0:
-                # Convert to TradingView format
                 tv_data = [{"time": i + 1, "value": round(val, 2)} for i, val in enumerate(eq_curve)]
-                json_data = json.dumps(tv_data)
-                self.web_view.page().runJavaScript(f"updateData({json_data})")
+                self._update_chart_data(tv_data)
         else:
             self.lbl_status.setText("Status: Walk-Forward Backtest Completed (No Results).")
-
 
     def _on_error(self, err):
         self.progress_bar.setVisible(False)

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TradingView Lightweight Charts</title>
-    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="lightweight-charts.standalone.production.js"></script>
     <style>
         body, html {
             margin: 0;
@@ -13,6 +13,7 @@
             width: 100%;
             background-color: #0D1117;
             overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
         #chart-container {
             width: 100%;
@@ -24,54 +25,86 @@
     <div id="chart-container"></div>
 
     <script>
-        const chartOptions = { 
-            layout: { 
-                textColor: '#90A0B7', 
-                background: { type: 'solid', color: '#0D1117' } 
-            },
-            grid: {
-                vertLines: { color: 'rgba(144, 160, 183, 0.1)' },
-                horzLines: { color: 'rgba(144, 160, 183, 0.1)' }
-            },
-            rightPriceScale: {
-                borderVisible: false,
-            },
-            timeScale: {
-                borderVisible: false,
-                timeVisible: true,
-                tickMarkFormatter: (time, tickMarkType, locale) => {
-                    return String(time);
-                }
-            },
-            crosshair: {
-                mode: LightweightCharts.CrosshairMode.Normal,
-            }
-        };
-        
-        const chart = LightweightCharts.createChart(document.getElementById('chart-container'), chartOptions);
-        
-        const lineSeries = chart.addLineSeries({ 
-            color: '#00E5FF', 
-            lineWidth: 2,
-            crosshairMarkerVisible: true,
-            crosshairMarkerRadius: 4,
-        });
+        let chart = null;
+        let lineSeries = null;
 
-        // Make chart responsive
-        new ResizeObserver(entries => {
-            if (entries.length === 0 || entries[0].target !== document.getElementById('chart-container')) { return; }
-            const newRect = entries[0].contentRect;
-            chart.applyOptions({ height: newRect.height, width: newRect.width });
-        }).observe(document.getElementById('chart-container'));
+        function initChart() {
+            const container = document.getElementById('chart-container');
+            const chartOptions = { 
+                layout: { 
+                    textColor: '#90A0B7', 
+                    background: { type: 'solid', color: '#0D1117' } 
+                },
+                grid: {
+                    vertLines: { color: 'rgba(144, 160, 183, 0.08)' },
+                    horzLines: { color: 'rgba(144, 160, 183, 0.08)' }
+                },
+                rightPriceScale: {
+                    borderVisible: false,
+                    scaleMargins: {
+                        top: 0.1,
+                        bottom: 0.1,
+                    },
+                },
+                timeScale: {
+                    borderVisible: false,
+                    timeVisible: true,
+                    tickMarkFormatter: (time, tickMarkType, locale) => {
+                        return String(time);
+                    }
+                },
+                crosshair: {
+                    mode: 1, // CrosshairMode Normal
+                }
+            };
+            
+            chart = LightweightCharts.createChart(container, chartOptions);
+            
+            const lineOptions = { 
+                color: '#00E5FF', 
+                lineWidth: 2,
+                crosshairMarkerVisible: true,
+                crosshairMarkerRadius: 4,
+            };
+
+            if (typeof chart.addLineSeries === 'function') {
+                lineSeries = chart.addLineSeries(lineOptions);
+            } else if (LightweightCharts.LineSeries) {
+                lineSeries = chart.addSeries(LightweightCharts.LineSeries, lineOptions);
+            }
+
+            // Make chart responsive
+            new ResizeObserver(entries => {
+                if (!entries.length || entries[0].target !== container) return;
+                const rect = entries[0].contentRect;
+                if (rect.width > 0 && rect.height > 0) {
+                    chart.applyOptions({ height: rect.height, width: rect.width });
+                }
+            }).observe(container);
+        }
 
         /**
          * Python will call this function to inject data.
          * data format: [ {time: 1, value: 10000}, {time: 2, value: 10100}, ... ]
          */
         function updateData(data) {
-            lineSeries.setData(data);
-            chart.timeScale().fitContent();
+            try {
+                if (!chart) {
+                    initChart();
+                }
+
+                if (lineSeries && Array.isArray(data)) {
+                    lineSeries.setData(data);
+                    chart.timeScale().fitContent();
+                }
+            } catch (err) {
+                console.error("updateData error:", err);
+            }
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart();
+        });
     </script>
 </body>
 </html>

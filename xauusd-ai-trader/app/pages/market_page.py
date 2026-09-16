@@ -2,6 +2,11 @@
 Market / Technical Charting Workspace Page.
 """
 
+import json
+import logging
+import os
+from pathlib import Path
+from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QPushButton, QComboBox, QCheckBox, QTableWidget, QTableWidgetItem, QHeaderView
@@ -9,18 +14,19 @@ from PySide6.QtWidgets import (
 from PySide6.QtWebEngineWidgets import QWebEngineView
 import numpy as np
 import pandas as pd
-import json
-import os
 
 from data.data_store import DataStore
 from data.data_collector import generate_sample_data
 
-# Removed CandlestickItem
+logger = logging.getLogger(__name__)
 
 
 class MarketPage(QWidget):
     def __init__(self):
         super().__init__()
+        self._is_page_loaded = False
+        self._pending_payload = None
+        self.current_df = None
         self._init_ui()
         self._load_chart_data()
 
@@ -71,12 +77,13 @@ class MarketPage(QWidget):
         chart_card.setProperty("class", "card")
         chart_layout = QVBoxLayout(chart_card)
 
-        self.chart_title = QLabel("<b>XAUUSD Gold Spot Price</b>")
+        self.chart_title = QLabel("<b>XAUUSD Gold Spot Price (H1)</b>")
         chart_layout.addWidget(self.chart_title)
 
         self.web_view = QWebEngineView()
-        template_path = os.path.join(os.path.dirname(__file__), "..", "templates", "tv_candle.html")
-        self.web_view.load(f"file:///{template_path.replace(chr(92), '/')}")
+        template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "templates", "tv_candle.html"))
+        self.web_view.load(QUrl.fromLocalFile(template_path))
+        self.web_view.loadFinished.connect(self._on_web_view_loaded)
         chart_layout.addWidget(self.web_view)
 
         layout.addWidget(chart_card, stretch=3)
@@ -109,6 +116,12 @@ class MarketPage(QWidget):
         mtf_layout.addWidget(table)
         layout.addWidget(mtf_card, stretch=1)
 
+    def _on_web_view_loaded(self, ok: bool):
+        self._is_page_loaded = ok
+        if ok and self._pending_payload:
+            self.web_view.page().runJavaScript(f"updateData({self._pending_payload})")
+            self._pending_payload = None
+
     def _load_chart_data(self):
         store = DataStore()
         tf = self.tf_combo.currentText()
@@ -124,24 +137,39 @@ class MarketPage(QWidget):
         if getattr(self, "current_df", None) is None or self.current_df.empty:
             return
 
-        df = self.current_df.tail(150).reset_index(drop=True)
+        df = self.current_df.tail(200).copy()
         
-        # Use simple integer indices for the x-axis to match how we display the backtest
+        # Format candle timestamps strictly ascending and unique
         candles = []
-        for i in range(len(df)):
-            row = df.iloc[i]
-            # Convert pandas Timestamp to unix timestamp (seconds) if available, otherwise use index
-            time_val = i + 1
-            if "timestamp" in df.columns:
-                time_val = int(row["timestamp"].timestamp())
-                
-            candles.append({
-                "time": time_val,
-                "open": float(row["open"]),
-                "high": float(row["high"]),
-                "low": float(row["low"]),
-                "close": float(row["close"])
-            })
+        if "timestamp" in df.columns:
+            df = df.sort_values("timestamp").drop_duplicates(subset=["timestamp"]).reset_index(drop=True)
+            for i, row in df.iterrows():
+                ts = row["timestamp"]
+                if hasattr(ts, "timestamp"):
+                    time_val = int(ts.timestamp())
+                else:
+                    try:
+                        time_val = int(pd.to_datetime(ts).timestamp())
+                    except Exception:
+                        time_val = int(i + 1)
+
+                candles.append({
+                    "time": time_val,
+                    "open": float(row["open"]),
+                    "high": float(row["high"]),
+                    "low": float(row["low"]),
+                    "close": float(row["close"]),
+                })
+        else:
+            df = df.reset_index(drop=True)
+            for i, row in df.iterrows():
+                candles.append({
+                    "time": int(i + 1),
+                    "open": float(row["open"]),
+                    "high": float(row["high"]),
+                    "low": float(row["low"]),
+                    "close": float(row["close"]),
+                })
 
         payload = {
             "candles": candles,
@@ -149,22 +177,22 @@ class MarketPage(QWidget):
         }
 
         # SMA Overlays
-        if self.chk_sma.isChecked() and len(df) >= 50:
+        if self.chk_sma.isChecked() and len(df) >= 20:
             sma20 = df["close"].rolling(20).mean()
-            sma50 = df["close"].rolling(50).mean()
-            
             payload["lines"].append({
                 "name": "sma20",
                 "color": "#FFD700",
                 "width": 2,
                 "data": [{"time": c["time"], "value": float(v)} for c, v in zip(candles, sma20) if not pd.isna(v)]
             })
-            payload["lines"].append({
-                "name": "sma50",
-                "color": "#FF5252",
-                "width": 2,
-                "data": [{"time": c["time"], "value": float(v)} for c, v in zip(candles, sma50) if not pd.isna(v)]
-            })
+            if len(df) >= 50:
+                sma50 = df["close"].rolling(50).mean()
+                payload["lines"].append({
+                    "name": "sma50",
+                    "color": "#FF5252",
+                    "width": 2,
+                    "data": [{"time": c["time"], "value": float(v)} for c, v in zip(candles, sma50) if not pd.isna(v)]
+                })
 
         # Bollinger Bands Overlays
         if self.chk_bb.isChecked() and len(df) >= 20:
@@ -176,15 +204,18 @@ class MarketPage(QWidget):
             payload["lines"].append({
                 "name": "bb_upper",
                 "color": "#7889A4",
-                "style": 2, # Dashed
+                "style": 2,  # Dashed
                 "data": [{"time": c["time"], "value": float(v)} for c, v in zip(candles, upper) if not pd.isna(v)]
             })
             payload["lines"].append({
                 "name": "bb_lower",
                 "color": "#7889A4",
-                "style": 2, # Dashed
+                "style": 2,  # Dashed
                 "data": [{"time": c["time"], "value": float(v)} for c, v in zip(candles, lower) if not pd.isna(v)]
             })
 
         json_data = json.dumps(payload)
-        self.web_view.page().runJavaScript(f"updateData({json_data})")
+        if self._is_page_loaded:
+            self.web_view.page().runJavaScript(f"updateData({json_data})")
+        else:
+            self._pending_payload = json_data
