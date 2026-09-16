@@ -19,7 +19,7 @@ class CandlestickItem(pg.GraphicsObject):
         data is a list/array of tuples: (time, open, close, min, max)
         """
         super().__init__()
-        self.data = data
+        self._chart_data = data
         self.picture = QPicture()
         self.generatePicture()
 
@@ -34,7 +34,7 @@ class CandlestickItem(pg.GraphicsObject):
         up_pen = pg.mkPen('g')
         down_pen = pg.mkPen('r')
 
-        for (t, open_p, close_p, min_p, max_p) in self.data:
+        for (t, open_p, close_p, min_p, max_p) in self._chart_data:
             if open_p > close_p:
                 p.setPen(down_pen)
                 p.setBrush(down_brush)
