@@ -139,9 +139,32 @@ class MarketPage(QWidget):
         self._plot_data(fit_content=True)
 
     def _plot_data_only(self):
-        """Poll latest data without changing title or forcing a view reset."""
-        store = DataStore()
+        """Poll latest data directly from MT5 for real-time ticking."""
+        from data.mt5_connector import MT5Connector, MT5_AVAILABLE
         tf = self.tf_combo.currentText()
+        
+        # 1. Try to fetch live ticks directly from MT5
+        if MT5_AVAILABLE:
+            connector = MT5Connector()
+            if connector.connect():
+                symbol_candidates = connector.discover_gold_symbols()
+                if symbol_candidates:
+                    broker_symbol = symbol_candidates[0].name
+                    import MetaTrader5 as mt5
+                    from data.mt5_connector import TIMEFRAME_MAP
+                    mt5_tf = TIMEFRAME_MAP.get(tf, mt5.TIMEFRAME_H1)
+                    rates = mt5.copy_rates_from_pos(broker_symbol, mt5_tf, 0, 250)
+                    if rates is not None and len(rates) > 0:
+                        df = pd.DataFrame(rates)
+                        df["timestamp"] = pd.to_datetime(df["time"], unit="s", utc=True)
+                        self.current_df = df
+                        self._plot_data(fit_content=False)
+                        connector.disconnect()
+                        return
+                connector.disconnect()
+
+        # 2. Fallback to DataStore if MT5 is unavailable or fails
+        store = DataStore()
         df = store.load_raw(symbol="XAUUSD", timeframe=tf, limit=250)
         if not df.empty:
             self.current_df = df

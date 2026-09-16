@@ -111,7 +111,28 @@ class NativeMT5Chart(QWidget):
         self.load_data()
 
     def load_data(self):
-        df = self.store.load_raw(self.current_symbol, self.current_timeframe, limit=300)
+        from data.mt5_connector import MT5Connector, MT5_AVAILABLE
+        df = pd.DataFrame()
+        
+        if MT5_AVAILABLE:
+            connector = MT5Connector()
+            if connector.connect():
+                symbol_candidates = connector.discover_gold_symbols()
+                if symbol_candidates:
+                    broker_symbol = symbol_candidates[0].name
+                    import MetaTrader5 as mt5
+                    from data.mt5_connector import TIMEFRAME_MAP
+                    mt5_tf = TIMEFRAME_MAP.get(self.current_timeframe, mt5.TIMEFRAME_H1)
+                    rates = mt5.copy_rates_from_pos(broker_symbol, mt5_tf, 0, 300)
+                    if rates is not None and len(rates) > 0:
+                        df = pd.DataFrame(rates)
+                        df["timestamp"] = pd.to_datetime(df["time"], unit="s", utc=True)
+                connector.disconnect()
+        
+        # Fallback to DataStore if MT5 fails or is missing
+        if df.empty:
+            df = self.store.load_raw(self.current_symbol, self.current_timeframe, limit=300)
+            
         if df.empty:
             return
         
