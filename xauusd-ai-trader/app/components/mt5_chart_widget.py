@@ -1,5 +1,9 @@
 """
 Native MT5 Chart Component using pyqtgraph.
+
+Maintains a persistent MT5 connection and polls at ~500ms for near-real-time
+candlestick updates. Only the last 2 bars are re-fetched on each tick to
+minimize overhead; full reloads happen on timeframe changes.
 """
 
 import pyqtgraph as pg
@@ -8,10 +12,14 @@ from PySide6.QtCore import Qt, QTimer, QRectF
 from PySide6.QtGui import QPicture, QPainter
 import pandas as pd
 import numpy as np
+import logging
 
 from data.data_store import DataStore
 from data.mt5_connector import MT5Connector
 from config.settings import load_settings
+
+logger = logging.getLogger(__name__)
+
 
 class CandlestickItem(pg.GraphicsObject):
     def __init__(self, data: list[tuple[float, float, float, float, float]]):
@@ -62,6 +70,13 @@ class NativeMT5Chart(QWidget):
         self.current_symbol = self.settings.symbol.internal_symbol
         self.current_timeframe = "M1"  # Default to M1
         
+        # Persistent MT5 connection state
+        self._mt5_connector: MT5Connector | None = None
+        self._broker_symbol: str | None = None
+        self._mt5_module = None  # Will hold the MetaTrader5 module
+        self._timeframe_map: dict | None = None
+        self._cached_df: pd.DataFrame = pd.DataFrame()
+        
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         
@@ -95,39 +110,117 @@ class NativeMT5Chart(QWidget):
         self.main_layout.addWidget(self.plot_widget)  # type: ignore
         
         self.candlestick = None
+        
+        # Initialize persistent MT5 connection, then do first full load
+        self._init_mt5_connection()
         self.load_data()
         
-        # Auto-refresh timer (every 5 seconds)
+        # Real-time tick timer — 500ms for near-real-time updates
         self.timer = QTimer(self)
-        self.timer.timeout.connect(self.poll_data)
-        self.timer.start(5000)
+        self.timer.timeout.connect(self._fast_tick)
+        self.timer.start(500)
 
-    def on_tf_changed(self, tf):
-        self.current_timeframe = tf
-        self.load_data()
-
-    def poll_data(self):
-        """Polls data silently, optionally updating MT5 via collector here or relying on background services."""
-        self.load_data()
-
-    def load_data(self):
-        from data.mt5_connector import MT5Connector, MT5_AVAILABLE
-        df = pd.DataFrame()
-        
-        if MT5_AVAILABLE:
+    def _init_mt5_connection(self):
+        """Establish a persistent MT5 connection that stays open for the lifetime of this widget."""
+        from data.mt5_connector import MT5_AVAILABLE, TIMEFRAME_MAP
+        if not MT5_AVAILABLE:
+            return
+        try:
+            import MetaTrader5 as mt5
+            self._mt5_module = mt5
+            self._timeframe_map = TIMEFRAME_MAP
+            
             connector = MT5Connector()
             if connector.connect():
                 symbol_candidates = connector.discover_gold_symbols()
                 if symbol_candidates:
-                    broker_symbol = symbol_candidates[0].name
-                    import MetaTrader5 as mt5
-                    from data.mt5_connector import TIMEFRAME_MAP
-                    mt5_tf = TIMEFRAME_MAP.get(self.current_timeframe, mt5.TIMEFRAME_H1)
-                    rates = mt5.copy_rates_from_pos(broker_symbol, mt5_tf, 0, 300)
-                    if rates is not None and len(rates) > 0:
-                        df = pd.DataFrame(rates)
-                        df["timestamp"] = pd.to_datetime(df["time"], unit="s", utc=True)
-                connector.disconnect()
+                    self._broker_symbol = symbol_candidates[0].name
+                    self._mt5_connector = connector
+                    logger.info("NativeMT5Chart: Persistent connection established for %s", self._broker_symbol)
+                else:
+                    connector.disconnect()
+        except Exception as e:
+            logger.warning("NativeMT5Chart: Could not init persistent MT5 connection: %s", e)
+
+    def _ensure_mt5(self) -> bool:
+        """Re-establish MT5 connection if it dropped."""
+        if self._mt5_module is None:
+            return False
+        # Quick health check
+        try:
+            info = self._mt5_module.terminal_info()
+            if info is not None:
+                return True
+        except Exception:
+            pass
+        # Reconnect
+        self._init_mt5_connection()
+        return self._broker_symbol is not None
+
+    def on_tf_changed(self, tf: str):
+        self.current_timeframe = tf
+        self.load_data()
+
+    def _fast_tick(self):
+        """
+        High-frequency tick handler (~500ms). Fetches only the last 2 bars
+        from MT5 and surgically updates the cached DataFrame, avoiding a
+        full 300-bar re-fetch each cycle.
+        """
+        if not self._ensure_mt5() or self._broker_symbol is None:
+            return
+        
+        mt5 = self._mt5_module
+        tf_map = self._timeframe_map or {}
+        mt5_tf = tf_map.get(self.current_timeframe, mt5.TIMEFRAME_H1)
+        
+        try:
+            # Fetch only last 2 bars (current forming + previous closed)
+            rates = mt5.copy_rates_from_pos(self._broker_symbol, mt5_tf, 0, 2)
+            if rates is None or len(rates) == 0:
+                return
+            
+            patch_df = pd.DataFrame(rates)
+            patch_df["timestamp"] = pd.to_datetime(patch_df["time"], unit="s", utc=True)
+            
+            if self._cached_df.empty:
+                # No cache yet — do a full load instead
+                self.load_data()
+                return
+            
+            # Merge: update existing rows by timestamp or append new ones
+            for _, new_row in patch_df.iterrows():
+                mask = self._cached_df["time"] == new_row["time"]
+                if mask.any():
+                    # Update in-place (the forming candle changed)
+                    idx = self._cached_df.index[mask][0]
+                    for col in ["open", "high", "low", "close", "tick_volume", "spread", "real_volume"]:
+                        if col in new_row.index and col in self._cached_df.columns:
+                            self._cached_df.at[idx, col] = new_row[col]
+                else:
+                    # New candle appeared — append and trim oldest
+                    new_row_df = pd.DataFrame([new_row])
+                    self._cached_df = pd.concat([self._cached_df, new_row_df], ignore_index=True)
+                    if len(self._cached_df) > 300:
+                        self._cached_df = self._cached_df.iloc[-300:].reset_index(drop=True)
+            
+            self._render_chart(fit_content=False)
+            
+        except Exception as e:
+            logger.debug("NativeMT5Chart fast_tick error: %s", e)
+
+    def load_data(self):
+        """Full data load — used on init and timeframe changes."""
+        df = pd.DataFrame()
+        
+        if self._ensure_mt5() and self._broker_symbol is not None:
+            mt5 = self._mt5_module
+            tf_map = self._timeframe_map or {}
+            mt5_tf = tf_map.get(self.current_timeframe, mt5.TIMEFRAME_H1)
+            rates = mt5.copy_rates_from_pos(self._broker_symbol, mt5_tf, 0, 300)
+            if rates is not None and len(rates) > 0:
+                df = pd.DataFrame(rates)
+                df["timestamp"] = pd.to_datetime(df["time"], unit="s", utc=True)
         
         # Fallback to DataStore if MT5 fails or is missing
         if df.empty:
@@ -136,10 +229,19 @@ class NativeMT5Chart(QWidget):
         if df.empty:
             return
         
-        # Format for pyqtgraph: (time, open, close, min, max)
-        # Using row index for X axis to avoid weekend gaps, then map index to timestamp strings in axis if needed
+        self._cached_df = df
+        self._render_chart(fit_content=True)
+
+    def _render_chart(self, fit_content: bool = False):
+        """Render the cached DataFrame as a candlestick chart."""
+        df = self._cached_df
+        if df.empty:
+            return
+            
+        # Format for pyqtgraph: (index, open, close, low, high)
         data_tuples = []
-        for i, row in df.iterrows():
+        for i in range(len(df)):
+            row = df.iloc[i]
             data_tuples.append((i, row['open'], row['close'], row['low'], row['high']))
             
         if self.candlestick is not None:
@@ -149,17 +251,19 @@ class NativeMT5Chart(QWidget):
         self.plot_widget.addItem(self.candlestick)
         
         # Set X axis labels
-        def format_time(val, pos):
-            idx = int(val)
-            if 0 <= idx < len(df):
-                return df.iloc[idx]['timestamp'].strftime("%H:%M:%S")
-            return ""
-            
+        ticks = [(i, df.iloc[i]['timestamp'].strftime("%H:%M")) for i in range(0, len(df), max(1, len(df)//10))]
         axis = self.plot_item.getAxis('bottom')
-        # We can't easily dynamically format ticks in standard AxisItem without a custom class, 
-        # so for now we leave it as index or we can set specific ticks.
-        ticks = [ (i, df.iloc[i]['timestamp'].strftime("%H:%M")) for i in range(0, len(df), max(1, len(df)//10)) ]
         axis.setTicks([ticks])
         
-        # Adjust view only if this is the first load or we changed TF
-        # self.plot_widget.autoRange()
+        if fit_content:
+            self.plot_widget.autoRange()
+
+    def closeEvent(self, event):
+        """Clean up persistent MT5 connection on widget close."""
+        self.timer.stop()
+        if self._mt5_connector is not None:
+            try:
+                self._mt5_connector.disconnect()
+            except Exception:
+                pass
+        super().closeEvent(event)

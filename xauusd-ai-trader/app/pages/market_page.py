@@ -1,5 +1,9 @@
 """
 Market / Technical Charting Workspace Page.
+
+Uses a persistent MT5 connection with 500ms polling for near-real-time
+candlestick updates. Only the last 2 bars are re-fetched on each tick;
+full reloads happen on timeframe changes.
 """
 
 import json
@@ -17,6 +21,7 @@ import pandas as pd
 
 from data.data_store import DataStore
 from data.data_collector import generate_sample_data
+from data.mt5_connector import MT5Connector
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +31,61 @@ class MarketPage(QWidget):
         super().__init__()
         self._is_page_loaded = False
         self._pending_payload = None
-        self.current_df = None
+        self.current_df: pd.DataFrame | None = None
+
+        # Persistent MT5 connection state
+        self._mt5_connector: MT5Connector | None = None
+        self._broker_symbol: str | None = None
+        self._mt5_module = None
+        self._timeframe_map: dict | None = None
+
         self._init_ui()
+        self._init_mt5_connection()
         self._load_chart_data()
         
-        # Auto-refresh timer for live ticking
+        # Real-time tick timer — 500ms for near-real-time updates
         self.timer = QTimer(self)
-        self.timer.timeout.connect(self._plot_data_only)
-        self.timer.start(5000)
+        self.timer.timeout.connect(self._fast_tick)
+        self.timer.start(500)
+
+    # ─── Persistent MT5 Connection ────────────────────────────────────────
+
+    def _init_mt5_connection(self):
+        """Establish a persistent MT5 connection for the lifetime of this page."""
+        from data.mt5_connector import MT5_AVAILABLE, TIMEFRAME_MAP
+        if not MT5_AVAILABLE:
+            return
+        try:
+            import MetaTrader5 as mt5
+            self._mt5_module = mt5
+            self._timeframe_map = TIMEFRAME_MAP
+
+            connector = MT5Connector()
+            if connector.connect():
+                symbol_candidates = connector.discover_gold_symbols()
+                if symbol_candidates:
+                    self._broker_symbol = symbol_candidates[0].name
+                    self._mt5_connector = connector
+                    logger.info("MarketPage: Persistent MT5 connection for %s", self._broker_symbol)
+                else:
+                    connector.disconnect()
+        except Exception as e:
+            logger.warning("MarketPage: Could not init persistent MT5: %s", e)
+
+    def _ensure_mt5(self) -> bool:
+        """Re-establish connection if it dropped."""
+        if self._mt5_module is None:
+            return False
+        try:
+            info = self._mt5_module.terminal_info()
+            if info is not None:
+                return True
+        except Exception:
+            pass
+        self._init_mt5_connection()
+        return self._broker_symbol is not None
+
+    # ─── UI Setup ─────────────────────────────────────────────────────────
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -127,10 +179,25 @@ class MarketPage(QWidget):
             self.web_view.page().runJavaScript(f"updateData({self._pending_payload})")
             self._pending_payload = None
 
+    # ─── Data Loading ─────────────────────────────────────────────────────
+
     def _load_chart_data(self):
-        store = DataStore()
+        """Full data load — used on init and timeframe changes."""
         tf = self.tf_combo.currentText()
-        df = store.load_raw(symbol="XAUUSD", timeframe=tf, limit=250)
+        df = pd.DataFrame()
+
+        if self._ensure_mt5() and self._broker_symbol is not None:
+            mt5 = self._mt5_module
+            tf_map = self._timeframe_map or {}
+            mt5_tf = tf_map.get(tf, mt5.TIMEFRAME_H1)
+            rates = mt5.copy_rates_from_pos(self._broker_symbol, mt5_tf, 0, 250)
+            if rates is not None and len(rates) > 0:
+                df = pd.DataFrame(rates)
+                df["timestamp"] = pd.to_datetime(df["time"], unit="s", utc=True)
+
+        if df.empty:
+            store = DataStore()
+            df = store.load_raw(symbol="XAUUSD", timeframe=tf, limit=250)
         if df.empty:
             df, _ = generate_sample_data(timeframe=tf, days=30)
 
@@ -138,37 +205,57 @@ class MarketPage(QWidget):
         self.chart_title.setText(f"<b>XAUUSD Gold Spot Price ({tf})</b>")
         self._plot_data(fit_content=True)
 
-    def _plot_data_only(self):
-        """Poll latest data directly from MT5 for real-time ticking."""
-        from data.mt5_connector import MT5Connector, MT5_AVAILABLE
-        tf = self.tf_combo.currentText()
-        
-        # 1. Try to fetch live ticks directly from MT5
-        if MT5_AVAILABLE:
-            connector = MT5Connector()
-            if connector.connect():
-                symbol_candidates = connector.discover_gold_symbols()
-                if symbol_candidates:
-                    broker_symbol = symbol_candidates[0].name
-                    import MetaTrader5 as mt5
-                    from data.mt5_connector import TIMEFRAME_MAP
-                    mt5_tf = TIMEFRAME_MAP.get(tf, mt5.TIMEFRAME_H1)
-                    rates = mt5.copy_rates_from_pos(broker_symbol, mt5_tf, 0, 250)
-                    if rates is not None and len(rates) > 0:
-                        df = pd.DataFrame(rates)
-                        df["timestamp"] = pd.to_datetime(df["time"], unit="s", utc=True)
-                        self.current_df = df
-                        self._plot_data(fit_content=False)
-                        connector.disconnect()
-                        return
-                connector.disconnect()
+    def _fast_tick(self):
+        """
+        High-frequency tick handler (~500ms). Fetches only the last 2 bars
+        and surgically patches the cached DataFrame.
+        """
+        if not self._ensure_mt5() or self._broker_symbol is None:
+            return
+        if self.current_df is None or self.current_df.empty:
+            return
 
-        # 2. Fallback to DataStore if MT5 is unavailable or fails
-        store = DataStore()
-        df = store.load_raw(symbol="XAUUSD", timeframe=tf, limit=250)
-        if not df.empty:
-            self.current_df = df
-        self._plot_data(fit_content=False)
+        mt5 = self._mt5_module
+        tf = self.tf_combo.currentText()
+        tf_map = self._timeframe_map or {}
+        mt5_tf = tf_map.get(tf, mt5.TIMEFRAME_H1)
+
+        try:
+            rates = mt5.copy_rates_from_pos(self._broker_symbol, mt5_tf, 0, 2)
+            if rates is None or len(rates) == 0:
+                return
+
+            patch_df = pd.DataFrame(rates)
+            patch_df["timestamp"] = pd.to_datetime(patch_df["time"], unit="s", utc=True)
+
+            df = self.current_df
+            changed = False
+
+            for _, new_row in patch_df.iterrows():
+                if "time" not in df.columns:
+                    break
+                mask = df["time"] == new_row["time"]
+                if mask.any():
+                    idx = df.index[mask][0]
+                    for col in ["open", "high", "low", "close", "tick_volume", "spread", "real_volume"]:
+                        if col in new_row.index and col in df.columns:
+                            df.at[idx, col] = new_row[col]
+                    changed = True
+                else:
+                    new_row_df = pd.DataFrame([new_row])
+                    df = pd.concat([df, new_row_df], ignore_index=True)
+                    if len(df) > 250:
+                        df = df.iloc[-250:].reset_index(drop=True)
+                    changed = True
+
+            if changed:
+                self.current_df = df
+                self._plot_data(fit_content=False)
+
+        except Exception as e:
+            logger.debug("MarketPage fast_tick error: %s", e)
+
+    # ─── Chart Rendering ──────────────────────────────────────────────────
 
     def _plot_data(self, fit_content=False):
         if self.current_df is None or self.current_df.empty:
@@ -258,3 +345,13 @@ class MarketPage(QWidget):
             self.web_view.page().runJavaScript(f"updateData({json_data})")
         else:
             self._pending_payload = json_data
+
+    def closeEvent(self, event):
+        """Clean up persistent MT5 connection on widget close."""
+        self.timer.stop()
+        if self._mt5_connector is not None:
+            try:
+                self._mt5_connector.disconnect()
+            except Exception:
+                pass
+        super().closeEvent(event)
