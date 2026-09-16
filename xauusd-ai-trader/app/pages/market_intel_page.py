@@ -12,6 +12,7 @@ import numpy as np
 
 from app.workers.macro_worker import MacroFetchWorker
 from app.components.tradingview_widget import TradingViewWidget
+from app.components.mt5_chart_widget import NativeMT5Chart
 from features.macro_features import add_all_macro_features, MacroRegime
 from data.data_store import DataStore
 from data.data_collector import generate_sample_data
@@ -32,12 +33,19 @@ class MarketIntelPage(QWidget):
 
         tabs = QTabWidget()
 
-        # ── Tab 0: TradingView Charts ──────────────────────────────────────
+        # ── Tab 0: MT5 Live Chart ──────────────────────────────────────────
+        tab_mt5_chart = QWidget()
+        l_mt5 = QVBoxLayout(tab_mt5_chart)
+        self.mt5_widget = NativeMT5Chart()
+        l_mt5.addWidget(self.mt5_widget)
+        tabs.addTab(tab_mt5_chart, "LIVE MT5 CHART")
+
+        # ── Tab 0.5: TradingView Charts ────────────────────────────────────
         tab_charts = QWidget()
         l_charts = QVBoxLayout(tab_charts)
         self.tv_widget = TradingViewWidget(symbol="OANDA:XAUUSD", interval="60")
         l_charts.addWidget(self.tv_widget)
-        tabs.addTab(tab_charts, "TRADINGVIEW CHARTS")
+        tabs.addTab(tab_charts, "MACRO CHARTS (TV)")
 
         # ── Tab 1: Cross-Market Indicators ─────────────────────────────────
         tab_cross = QWidget()
