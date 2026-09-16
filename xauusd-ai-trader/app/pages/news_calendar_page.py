@@ -20,9 +20,9 @@ class NewsCalendarPage(QWidget):
         self.news_collector = NewsCollector()
         self.calendar_collector = CalendarCollector()
         
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(20, 20, 20, 20)
-        self.layout.setSpacing(20)
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(20, 20, 20, 20)
+        self.main_layout.setSpacing(20)
         
         self._setup_header()
         
@@ -32,8 +32,7 @@ class NewsCalendarPage(QWidget):
         
         self._setup_calendar_panel()
         self._setup_news_panel()
-        
-        self.layout.addLayout(self.content_layout)
+        self.main_layout.addLayout(self.content_layout)
         
         # Load data immediately
         self.refresh_data()
@@ -62,8 +61,7 @@ class NewsCalendarPage(QWidget):
         header_layout.addWidget(title)
         header_layout.addStretch()
         header_layout.addWidget(self.btn_refresh)
-        
-        self.layout.addLayout(header_layout)
+        self.main_layout.addLayout(header_layout)
 
     def _setup_calendar_panel(self):
         panel = QFrame()
@@ -151,7 +149,7 @@ class NewsCalendarPage(QWidget):
             cal_df = self.calendar_collector.get_events_in_range(now, now + timedelta(days=60))
             
             self.cal_table.setRowCount(len(cal_df))
-            for row_idx, row in cal_df.iterrows():
+            for i, (_, row) in enumerate(cal_df.iterrows()):
                 dt_str = row["timestamp"].strftime("%Y-%m-%d %H:%M")
                 
                 item_date = QTableWidgetItem(dt_str)
@@ -164,13 +162,13 @@ class NewsCalendarPage(QWidget):
                 
                 for item in (item_date, item_event, item_ccy, item_impact):
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    self.cal_table.setItem(row_idx, item.column(), item)
+                    self.cal_table.setItem(i, item.column(), item)
                     
             # 2. Update News
             news_df = self.news_collector.fetch_latest_news()
             self.news_table.setRowCount(len(news_df))
             
-            for row_idx, row in news_df.iterrows():
+            for i, (_, row) in enumerate(news_df.iterrows()):
                 time_str = row["timestamp"].strftime("%m-%d %H:%M")
                 sentiment = row["sentiment"]
                 
@@ -202,7 +200,7 @@ class NewsCalendarPage(QWidget):
                 
                 for col_idx, item in enumerate((item_time, item_sym, item_title, item_sent)):
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    self.news_table.setItem(row_idx, col_idx, item)
+                    self.news_table.setItem(i, col_idx, item)
                     
         finally:
             self.btn_refresh.setText("REFRESH FEEDS")

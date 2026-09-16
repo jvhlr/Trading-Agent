@@ -42,13 +42,13 @@ class TradeFreezeEngine:
             signals = self.base_model.get_signals(df)
         else:
             # Recreate features if get_signals is not natively supported
-            from features.price_features import compute_price_features
-            from features.technical_features import compute_technical_features
-            from features.structure_features import compute_structure_features
+            from features.price_features import add_all_price_features
+            from features.technical_features import add_all_technical_features
+            from features.structure_features import add_all_structure_features
             X = df.copy()
-            X = compute_price_features(X)
-            X = compute_technical_features(X)
-            X = compute_structure_features(X)
+            X = add_all_price_features(X)
+            X = add_all_technical_features(X)
+            X = add_all_structure_features(X)
             X = X.dropna()
             
             if X.empty:
