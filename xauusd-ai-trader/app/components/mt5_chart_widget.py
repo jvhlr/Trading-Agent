@@ -111,12 +111,9 @@ class NativeMT5Chart(QWidget):
         self.load_data()
 
     def load_data(self):
-        df = self.store.load_raw(self.current_symbol, self.current_timeframe)
+        df = self.store.load_raw(self.current_symbol, self.current_timeframe, limit=300)
         if df.empty:
             return
-            
-        # Display the last 300 candles to avoid performance drops
-        df = df.tail(300).reset_index(drop=True)
         
         # Format for pyqtgraph: (time, open, close, min, max)
         # Using row index for X axis to avoid weekend gaps, then map index to timestamp strings in axis if needed

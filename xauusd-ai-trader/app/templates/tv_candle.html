@@ -133,7 +133,7 @@
                     });
                 }
                 
-                if (chart) {
+                if (chart && (payload.fit_content === undefined || payload.fit_content === true)) {
                     chart.timeScale().fitContent();
                 }
             } catch (err) {

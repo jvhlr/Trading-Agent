@@ -211,6 +211,7 @@ class DataStore:
         start: Optional[datetime] = None,
         end: Optional[datetime] = None,
         dataset_id: Optional[str] = None,
+        limit: Optional[int] = None,
     ) -> pd.DataFrame:
         """
         Load stored candle data.
@@ -221,6 +222,7 @@ class DataStore:
             start: Optional start datetime filter.
             end: Optional end datetime filter.
             dataset_id: Optional specific dataset version to load.
+            limit: Optional maximum number of recent rows to return.
 
         Returns:
             DataFrame with candle data, or empty DataFrame if not found.
@@ -249,18 +251,22 @@ class DataStore:
             query += " AND timestamp <= ?"
             params.append(end.isoformat())
 
-        query += " ORDER BY timestamp ASC"
+        if limit:
+            query += " ORDER BY timestamp DESC LIMIT ?"
+            params.append(limit)
+        else:
+            query += " ORDER BY timestamp ASC"
 
         with sqlite3.connect(self.db_path) as conn:
             df = pd.read_sql_query(query, conn, params=params)
 
+        if limit and not df.empty:
+            df = df.sort_values("timestamp", ascending=True).reset_index(drop=True)
+
         if len(df) > 0:
             df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
-            logger.info(
-                "Loaded %d candles (%s %s, %s → %s).",
-                len(df), symbol, timeframe,
-                df["timestamp"].min(), df["timestamp"].max(),
-            )
+            # Remove verbose logging for live polling to avoid terminal spam
+            # logger.info("Loaded %d candles", len(df))
         else:
             logger.warning("No data found for %s %s with given filters.", symbol, timeframe)
 

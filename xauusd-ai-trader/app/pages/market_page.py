@@ -6,7 +6,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import QUrl, QTimer
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QPushButton, QComboBox, QCheckBox, QTableWidget, QTableWidgetItem, QHeaderView
@@ -29,6 +29,11 @@ class MarketPage(QWidget):
         self.current_df = None
         self._init_ui()
         self._load_chart_data()
+        
+        # Auto-refresh timer for live ticking
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self._plot_data_only)
+        self.timer.start(5000)
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -125,15 +130,24 @@ class MarketPage(QWidget):
     def _load_chart_data(self):
         store = DataStore()
         tf = self.tf_combo.currentText()
-        df = store.load_raw(symbol="XAUUSD", timeframe=tf)
+        df = store.load_raw(symbol="XAUUSD", timeframe=tf, limit=250)
         if df.empty:
             df, _ = generate_sample_data(timeframe=tf, days=30)
 
         self.current_df = df
         self.chart_title.setText(f"<b>XAUUSD Gold Spot Price ({tf})</b>")
-        self._plot_data()
+        self._plot_data(fit_content=True)
 
-    def _plot_data(self):
+    def _plot_data_only(self):
+        """Poll latest data without changing title or forcing a view reset."""
+        store = DataStore()
+        tf = self.tf_combo.currentText()
+        df = store.load_raw(symbol="XAUUSD", timeframe=tf, limit=250)
+        if not df.empty:
+            self.current_df = df
+        self._plot_data(fit_content=False)
+
+    def _plot_data(self, fit_content=False):
         if getattr(self, "current_df", None) is None or self.current_df.empty:
             return
 
@@ -213,6 +227,8 @@ class MarketPage(QWidget):
                 "style": 2,  # Dashed
                 "data": [{"time": c["time"], "value": float(v)} for c, v in zip(candles, lower) if not pd.isna(v)]
             })
+
+        payload["fit_content"] = fit_content
 
         json_data = json.dumps(payload)
         if self._is_page_loaded:
