@@ -37,6 +37,7 @@ from models.classifiers import (
     GradientBoostingModel,
 )
 from models.macro_gated_model import MacroGatedModel
+from models.trade_freeze_engine import TradeFreezeEngine
 from backtester.backtest_types import BacktestConfig
 from backtester.sim import run_backtest
 from backtester.walk_forward import run_walk_forward
@@ -170,6 +171,13 @@ def run_backtest_terminal(
             ("Macro-Gated Random Forest", lambda: MacroGatedModel(
                 RandomForestModel(n_estimators=100, max_depth=4, random_state=42),
                 feature_names=feature_cols
+            )),
+            ("News-Frozen Macro-Gated GB", lambda: TradeFreezeEngine(
+                MacroGatedModel(
+                    GradientBoostingModel(n_estimators=100, learning_rate=0.03, max_depth=3, random_state=42),
+                    feature_names=feature_cols
+                ),
+                freeze_minutes=30
             )),
         ])
 

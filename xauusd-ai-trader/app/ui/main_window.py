@@ -22,6 +22,7 @@ from app.pages.risk_page import RiskPage
 from app.pages.paper_trading_page import PaperTradingPage
 from app.pages.system_logs_page import SystemLogsPage
 from app.pages.progress_tracker_page import ProgressTrackerPage
+from app.pages.news_calendar_page import NewsCalendarPage
 
 
 class MainWindow(QMainWindow):
@@ -97,6 +98,7 @@ class MainWindow(QMainWindow):
             ("RESEARCH BACKTEST", BacktestPage()),
             ("VALIDATION", ValidationPage()),
             ("MARKET INTEL", MarketIntelPage()),
+            ("NEWS & CALENDAR", NewsCalendarPage()),
             ("HISTORICAL MEMORY", MemoryPage()),
             ("DECISION PIPELINE", DecisionPipelinePage()),
             ("SMALL ACCOUNT ($200)", SmallAccountPage()),
