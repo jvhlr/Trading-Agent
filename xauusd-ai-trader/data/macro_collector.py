@@ -12,18 +12,27 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
+try:
+    from tvDatafeed import TvDatafeed, Interval
+    TV_AVAILABLE = True
+    # Initialize without login for public data
+    tv = TvDatafeed()
+except ImportError:
+    TV_AVAILABLE = False
+    tv = None
+
 from data.macro_data_store import MacroDataStore
 
 logger = logging.getLogger(__name__)
 
 MACRO_TICKER_MAP = {
-    "DXY": {"ticker": "DX-Y.NYB", "name": "US Dollar Index"},
-    "US10Y": {"ticker": "^TNX", "name": "US 10-Year Treasury Yield"},
-    "US02Y": {"ticker": "^IRX", "name": "US Short-Term Rate Proxy"},
-    "TIP": {"ticker": "TIP", "name": "iShares TIPS Bond ETF (Real Yield Proxy)"},
-    "VIX": {"ticker": "^VIX", "name": "CBOE Volatility Index"},
-    "XAG": {"ticker": "SI=F", "name": "Silver Futures (XAGUSD Proxy)"},
-    "BRENT": {"ticker": "BZ=F", "name": "Brent Crude Oil"},
+    "DXY": {"ticker": "DX-Y.NYB", "name": "US Dollar Index", "tv_symbol": "DXY", "tv_exchange": "ICEUS"},
+    "US10Y": {"ticker": "^TNX", "name": "US 10-Year Treasury Yield", "tv_symbol": "US10Y", "tv_exchange": "TVC"},
+    "US02Y": {"ticker": "^IRX", "name": "US Short-Term Rate Proxy", "tv_symbol": "US02Y", "tv_exchange": "TVC"},
+    "TIP": {"ticker": "TIP", "name": "iShares TIPS Bond ETF (Real Yield Proxy)", "tv_symbol": "TIP", "tv_exchange": "AMEX"},
+    "VIX": {"ticker": "^VIX", "name": "CBOE Volatility Index", "tv_symbol": "VIX", "tv_exchange": "CBOE"},
+    "XAG": {"ticker": "SI=F", "name": "Silver Futures (XAGUSD Proxy)", "tv_symbol": "XAGUSD", "tv_exchange": "OANDA"},
+    "BRENT": {"ticker": "BZ=F", "name": "Brent Crude Oil", "tv_symbol": "UKOIL", "tv_exchange": "TVC"},
 }
 
 
@@ -57,8 +66,43 @@ class MacroCollector:
             self.store.store_macro_series(ticker, name, df)
             return df
 
+        # Attempt TradingView first
+        if TV_AVAILABLE and tv is not None:
+            tv_sym = info.get("tv_symbol")
+            tv_exc = info.get("tv_exchange")
+            
+            try:
+                logger.info("Fetching macro data from TradingView for %s (%s:%s)...", key, tv_exc, tv_sym)
+                
+                tv_interval = Interval.in_daily
+                if interval == "1h":
+                    tv_interval = Interval.in_1_hour
+                    
+                n_bars = 730 if interval == "1d" else 5000
+                
+                tv_data = tv.get_hist(symbol=tv_sym, exchange=tv_exc, interval=tv_interval, n_bars=n_bars)
+                
+                if tv_data is not None and not tv_data.empty:
+                    df = tv_data.copy().reset_index()
+                    df.rename(columns={"datetime": "timestamp"}, inplace=True)
+                    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+                    
+                    for col in ["open", "high", "low", "close", "volume"]:
+                        if col in df.columns:
+                            df[col] = pd.to_numeric(df[col], errors="coerce")
+                            
+                    df = df.dropna(subset=["close"]).sort_values("timestamp").reset_index(drop=True)
+                    self.store.store_macro_series(ticker, name, df)
+                    logger.info("Successfully fetched %s from TradingView.", key)
+                    return df
+                else:
+                    logger.warning("TradingView returned empty data for %s. Falling back to yfinance.", key)
+            except Exception as e:
+                logger.warning("Failed to fetch %s from TradingView: %s. Falling back to yfinance.", key, e)
+
+        # Fallback to yfinance
         try:
-            logger.info("Fetching macro data for %s (%s)...", key, ticker)
+            logger.info("Fetching macro data for %s (%s) via yfinance...", key, ticker)
             raw = yf.download(ticker, period=period, interval=interval, progress=False)
             if raw.empty:
                 logger.warning("Empty data returned for %s from yfinance. Falling back to synthetic.", ticker)
