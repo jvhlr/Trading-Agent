@@ -12,6 +12,7 @@ Usage:
 """
 
 import argparse
+from typing import Any, Callable
 import sys
 from pathlib import Path
 
@@ -42,7 +43,7 @@ from backtester.walk_forward import run_walk_forward
 def _build_model_factories(
     feature_cols: list[str],
     include_macro: bool,
-) -> list[tuple[str, object]]:
+) -> list[tuple[str, Callable[[], Any]]]:
     """
     Build the list of (name, factory) pairs for the benchmark suite.
 
@@ -52,7 +53,7 @@ def _build_model_factories(
     fast_sma_idx = feature_cols.index("sma_20") if "sma_20" in feature_cols else 0
     slow_sma_idx = feature_cols.index("sma_50") if "sma_50" in feature_cols else 1
 
-    factories: list[tuple[str, object]] = [
+    factories: list[tuple[str, Callable[[], Any]]] = [
         ("Random (Weighted)",    lambda: RandomBaseline(weighted=True, seed=42)),
         ("Majority (Always WAIT)", lambda: MajorityWaitBaseline()),
         ("Momentum (Prev Return)", lambda: PreviousReturnMomentumBaseline(
@@ -103,9 +104,9 @@ def _build_model_factories(
 def _run_walk_forward_benchmark(
     df,
     feature_cols: list[str],
-    model_factories: list[tuple[str, object]],
+    model_factories: list[tuple[str, Callable[[], Any]]],
     bt_config: BacktestConfig,
-) -> str:
+) -> tuple[str, float]:
     """Run walk-forward cross-validation and print a summary table."""
     print("\n[WALK-FORWARD BENCHMARK SUMMARY]")
     print("=" * 115)
@@ -149,7 +150,7 @@ def _run_walk_forward_benchmark(
 def _run_single_holdout(
     df,
     feature_cols: list[str],
-    model_factories: list[tuple[str, object]],
+    model_factories: list[tuple[str, Callable[[], Any]]],
     bt_config: BacktestConfig,
 ) -> tuple[str, float]:
     """Run single train/test split backtest and print a summary table."""
