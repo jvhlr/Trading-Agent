@@ -1,9 +1,9 @@
 # XAUUSD AI Trading Research System — Project Progress Report
 
-> **Date**: September 16, 2026  
-> **Status**: **Phase 0–3 Completed | Research Gate #1 Evaluated | Ready for Phase 4**  
+> **Date**: October 29, 2026  
+> **Status**: **Phase 5 Built and Wired, Tests Added**  
 > **Live Trading**: **DISABLED** (Fail-closed research mode)  
-> **Test Suite**: **101 / 101 Tests Passing (100%)**
+> **Test Suite**: **161 / 161 Tests Passing (100%)**
 
 ---
 
@@ -58,8 +58,9 @@ flowchart TD
 | **Phase 2** | Feature Engineering & Baseline ML | ✅ **COMPLETED** | 35 features, strict train-scaler isolation, 7 benchmark models |
 | **Phase 3** | Realistic Backtester & Walk-Forward | ✅ **COMPLETED** | Bar-by-bar sim with spread/slippage & 18-fold rolling walk-forward |
 | **Research Gate #1** | Formal Statistical / Financial Audit | ✅ **AUDITED** | Proved pure technical ML overfits; macro drivers required |
-| **Phase 4** | Cross-Market & Macro Intelligence | ⏳ **NEXT UP** | Ingest DXY, US10Y, TIPS Real Yields, VIX, WTI Crude Oil |
-| **Phases 5–11** | News NLP, Similarity, Paper & Live Trading | 🔒 **LOCKED** | Trading strictly disabled per fail-closed safety policy |
+| **Phase 4** | Cross-Market & Macro Intelligence | ✅ **COMPLETED** | DXY, Real Yields, VIX, WTI Crude integrated; MacroGatedModel wired |
+| **Phase 5** | News NLP, Calendar & Trade Freeze Engine | ✅ **COMPLETED (with caveats)** | CalendarCollector, NewsCollector, TradeFreezeEngine built and wired into `backtest.py`; 51 hardening tests added |
+| **Phases 6–11** | Similarity, Paper & Live Trading | 🔒 **LOCKED** | Trading strictly disabled per fail-closed safety policy |
 
 ---
 
@@ -120,10 +121,23 @@ Gradient Boosting       |    18 |          6 |        980 |    29.2% |          
 ## 6. Test Suite & Verification Status
 
 ```
-================================== 101 passed in 2.19s ==================================
+================================== 161 passed in 4.98s ==================================
 ```
 
-All 101 automated unit and integration tests across data validation, store versioning, look-ahead leakage prevention, feature math, models, baselines, and walk-forward engines are passing.
+All 161 automated unit and integration tests across data validation, store versioning,
+look-ahead leakage prevention, feature math, models, baselines, walk-forward engines,
+and the Phase 5 news/calendar/freeze stack are passing.
+
+> [!NOTE]
+> **Known Limitations (Phase 5)**
+> - **Synthetic calendar**: `CalendarCollector` generates NFP/FOMC dates from calendar
+>   arithmetic (first Friday of month, 3rd Wednesday of even months) rather than from
+>   real historical release dates. The News-Frozen benchmark therefore runs against
+>   *estimated* event windows, not confirmed ones. Replacing with real historical data
+>   is a separate task.
+> - **TextBlob sentiment quality**: Sentiment scores are computed via TextBlob polarity
+>   on headline text. This proxy has not been validated against labelled financial
+>   sentiment datasets; its signal contribution is unquantified.
 
 ---
 
