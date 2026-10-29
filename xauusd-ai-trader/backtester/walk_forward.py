@@ -15,6 +15,7 @@ import numpy as np
 
 from models.dataset_builder import build_dataset
 from models.baselines import BaseModel
+from models.trade_freeze_engine import TradeFreezeEngine, apply_freeze_veto
 from .backtest_types import BacktestConfig, BacktestResult, Trade
 from .sim import run_backtest
 
@@ -35,6 +36,7 @@ class WalkForwardFoldResult:
     n_train_samples: int
     n_test_samples: int
     test_result: BacktestResult
+    n_wait_predictions: int = 0
 
 
 @dataclass
@@ -102,6 +104,7 @@ def run_walk_forward(
 
     start_idx = 0
     fold_counter = 0
+    calendar_df: Optional[pd.DataFrame] = None
 
     while start_idx + window_total <= n_samples:
         fold_counter += 1
@@ -134,8 +137,27 @@ def run_walk_forward(
 
         # Run backtest simulator on Test portion of cleaned fold DataFrame
         test_df = ds.raw_df_cleaned.iloc[-len(ds.X_test):].reset_index(drop=True)
+
+        if isinstance(model, TradeFreezeEngine):
+            if calendar_df is None:
+                from data.calendar_collector import CalendarCollector
+                collector = CalendarCollector()
+                full_ts = df["timestamp"] if "timestamp" in df.columns else timestamps
+                start_dt = full_ts.min() - pd.Timedelta(minutes=model.freeze_minutes)
+                end_dt = full_ts.max() + pd.Timedelta(minutes=model.freeze_minutes)
+                calendar_df = collector.get_events_in_range(start_dt, end_dt)
+
+            test_preds = apply_freeze_veto(
+                timestamps=test_df["timestamp"],
+                predictions=test_preds,
+                freeze_minutes=model.freeze_minutes,
+                wait_label=0,
+                calendar_df=calendar_df,
+            )
+
         test_result = run_backtest(test_df, test_preds, config=config)
 
+        n_waits = int((np.asarray(test_preds) == 0).sum())
         fold_res = WalkForwardFoldResult(
             fold_index=fold_counter,
             train_start=timestamps.iloc[start_idx],
@@ -148,6 +170,7 @@ def run_walk_forward(
             n_train_samples=len(ds.X_train),
             n_test_samples=len(ds.X_test),
             test_result=test_result,
+            n_wait_predictions=n_waits,
         )
 
         fold_results.append(fold_res)

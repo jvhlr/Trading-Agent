@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from models.baselines import BaseModel
-from models.trade_freeze_engine import TradeFreezeEngine
+from models.trade_freeze_engine import TradeFreezeEngine, apply_freeze_veto
 from models.macro_gated_model import MacroGatedModel
 from models.classifiers import GradientBoostingModel
 
@@ -142,12 +142,17 @@ class TestTradeFreezeEngineFallbackPath:
         timestamps = [start + timedelta(hours=i) for i in range(n)]
         return _make_ohlc_df(timestamps)
 
-    def test_buy_inside_freeze_window_becomes_wait(self):
+    def test_fallback_path_nan_features_early_return_contract(self):
+        """
+        Documents early-return contract: when structure-feature NaNs empty the frame
+        at small/medium bar counts, get_signals safely early-returns all-WAIT.
+        """
         df = self._make_long_ohlc(NFP_JAN2025)
         base = MockPredictOnlyModel()
         engine = TradeFreezeEngine(base, freeze_minutes=30)
         result = engine.get_signals(df)
         assert result.iloc[-1] == 'WAIT', f'Expected WAIT, got {result.iloc[-1]}'
+        assert all(s == 'WAIT' for s in result)
 
 
 # PLUMBING
@@ -179,10 +184,15 @@ class TestTradeFreezeEnginePlumbing:
         assert engine.calendar_df.empty
 
 
-# INTEGRATION: exact backtest.py wiring
+# INTEGRATION: exact backtest.py wiring smoke test
 
 class TestTradeFreezeEngineIntegration:
-    def test_production_wiring(self):
+    def test_production_wiring_smoke(self):
+        """
+        Wiring smoke test verifying pipeline compatibility:
+        TradeFreezeEngine -> MacroGatedModel -> GradientBoostingModel.
+        (50 bars < SMA-200 window, so this tests pipeline integration without firing the veto).
+        """
         np.random.seed(0)
         start = _utc(2025, 1, 14, 0, 0)
         timestamps = [start + timedelta(hours=i) for i in range(50)]
@@ -195,3 +205,59 @@ class TestTradeFreezeEngineIntegration:
         assert isinstance(result, pd.Series)
         assert len(result) == len(df)
         assert all(s in ('BUY', 'SELL', 'WAIT') for s in result)
+
+
+# HELPER UNIT TESTS: apply_freeze_veto
+
+class TestApplyFreezeVetoHelper:
+    """Unit tests for the extracted pure apply_freeze_veto helper."""
+
+    def test_bar_inside_window_flipped(self):
+        # NFP is at 2025-01-03 13:30 UTC
+        # Bar at 13:20 (10 min before NFP) with BUY (+1) -> flipped to 0 (WAIT)
+        # Bar at 13:40 (10 min after NFP) with SELL (-1) -> flipped to 0 (WAIT)
+        ts = [_utc(2025, 1, 3, 13, 20), _utc(2025, 1, 3, 13, 40)]
+        preds = [1, -1]
+        out = apply_freeze_veto(ts, preds, freeze_minutes=30)
+        assert out == [0, 0]
+
+    def test_bar_31_min_out_kept(self):
+        # 31 min before NFP (12:59) and 31 min after NFP (14:01)
+        ts = [_utc(2025, 1, 3, 12, 59), _utc(2025, 1, 3, 14, 1)]
+        preds = np.array([1, -1])
+        out = apply_freeze_veto(ts, preds, freeze_minutes=30)
+        assert isinstance(out, np.ndarray)
+        assert list(out) == [1, -1]
+
+    def test_wait_stays_wait(self):
+        # Bar inside window already WAIT (0) stays 0
+        ts = [_utc(2025, 1, 3, 13, 25)]
+        preds = [0]
+        out = apply_freeze_veto(ts, preds, freeze_minutes=30)
+        assert out == [0]
+
+    def test_custom_freeze_minutes_respected(self):
+        # freeze_minutes=10:
+        # Bar at 13:15 is 15 min before NFP -> KEPT (+1)
+        # Bar at 13:25 is 5 min before NFP -> FLIPPED to 0
+        ts = [_utc(2025, 1, 3, 13, 15), _utc(2025, 1, 3, 13, 25)]
+        preds = [1, 1]
+        out = apply_freeze_veto(ts, preds, freeze_minutes=10)
+        assert out == [1, 0]
+
+    def test_empty_inputs_return_empty(self):
+        # List in -> list out
+        assert apply_freeze_veto([], []) == []
+        # Ndarray in -> ndarray out
+        arr_out = apply_freeze_veto(pd.Series([], dtype="datetime64[ns]"), np.array([], dtype=int))
+        assert isinstance(arr_out, np.ndarray) and len(arr_out) == 0
+        # Series in -> Series out
+        s_out = apply_freeze_veto(pd.Series([], dtype="datetime64[ns]"), pd.Series([], dtype=int))
+        assert isinstance(s_out, pd.Series) and len(s_out) == 0
+
+    def test_exact_boundary_frozen(self):
+        # Exactly -30 min (13:00) and exactly +30 min (14:00) relative to 13:30
+        ts = [_utc(2025, 1, 3, 13, 0), _utc(2025, 1, 3, 14, 0)]
+        preds = [1, -1]
+        out = apply_freeze_veto(ts, preds, freeze_minutes=30)
+        assert out == [0, 0]

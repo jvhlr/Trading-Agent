@@ -1,9 +1,9 @@
 # XAUUSD AI Trading Research System — Project Progress Report
 
-> **Date**: September 16, 2026  
-> **Status**: **Phase 0–4 Completed | Research Gate #2 Evaluated | Ready for Phase 5**  
+> **Date**: October 30, 2026  
+> **Status**: **Phase 0–5 Completed | Research Gate #2 Evaluated | Trade Freeze Veto Wired**  
 > **Live Trading**: **DISABLED** (Fail-closed research mode)  
-> **Test Suite**: **110 / 110 Tests Passing (100%)**
+> **Test Suite**: **168 / 168 Tests Passing (100%)**
 
 ---
 
@@ -18,6 +18,7 @@ We have established the core quantitative research and engineering foundation fo
 5. **Phase 4 (Cross-Market & Macro Intelligence)**: Built multi-asset macro collector, SQLite macro store, and backward `merge_asof` zero look-ahead alignment for DXY, US10Y, US02Y, TIP, VIX, XAGUSD, and Brent Crude. Developed deterministic `MacroGatedModel` wrapper that filters out false-conviction trades during adverse macro regimes.
 6. **Desktop Research Workstation GUI**: Built a PySide6 workstation featuring interactive, offline **TradingView Lightweight Charts v5** for candlestick and equity curve visualization across 12 analytical pages.
 7. **Research Gate #2 Formal Audit**: Evaluated Macro-Gated models across 18 rolling walk-forward folds on real historical data. Confirmed that **macro gating eliminates hundreds of false signals, cutting model losses by more than half and improving Win Rates and Profit Factors across all ML architectures**.
+8. **Phase 5 (News NLP, Calendar & Trade Freeze Engine)**: Built `CalendarCollector` (deterministic NFP/FOMC event generator), `NewsCollector` (financial RSS & TextBlob sentiment scoring), and `TradeFreezeEngine` with a pure `apply_freeze_veto` helper wired into the walk-forward validation and holdout simulation paths.
 
 ---
 
@@ -42,6 +43,7 @@ flowchart TD
         FEAT[Price + Technical + Structure + Macro Features]
         ML[Baselines + ML Classifiers + Macro-Gated Models]
         SIM[Realistic Sim + 18-Fold Walk-Forward Cross-Validation]
+        FREEZE[Calendar Collector + News NLP + Trade Freeze Engine]
         GUI[PySide6 Workstation + TradingView Engine]
     end
 
@@ -62,7 +64,7 @@ flowchart TD
 | **Research Gate #1** | Formal Statistical / Financial Audit | ✅ **AUDITED** | Proved pure technical ML overfits; macro drivers required |
 | **Phase 4** | Cross-Market & Macro Intelligence | ✅ **COMPLETED** | Ingested DXY, US10Y, US02Y, TIP, VIX, XAG, Brent; MacroGatedModel |
 | **Research Gate #2** | Macro Gating Walk-Forward Audit | ✅ **AUDITED** | Macro gating cut ML drawdowns >50%, boosted win rate & PF |
-| **Phase 5** | News NLP & Economic Calendar Intelligence | ⏳ **NEXT UP** | Economic calendar release impact parser & high-impact news veto |
+| **Phase 5** | News NLP, Calendar & Trade Freeze Engine | ✅ **COMPLETED (with caveats)** | CalendarCollector, NewsCollector, TradeFreezeEngine built & wired into walk-forward CV; 58 tests added |
 | **Phases 6–11** | Historical Similarity, Paper & Live Trading | 🔒 **LOCKED** | Trading strictly disabled per fail-closed safety policy |
 
 ---
@@ -96,6 +98,11 @@ flowchart TD
 ### E. User Interface & Charting (`app/`)
 * **TradingView Lightweight Charts v5** ([`tv_candle.html`](file:///c:/Users/Jayvee%20Hilario/OneDrive%20-%20Polytechnic%20University%20of%20the%20Philippines/Desktop/AI%20Crypto%20Trading%20Bot/xauusd-ai-trader/app/templates/tv_candle.html), [`tv_line.html`](file:///c:/Users/Jayvee%20Hilario/OneDrive%20-%20Polytechnic%20University%20of%20the%20Philippines/Desktop/AI%20Crypto%20Trading%20Bot/xauusd-ai-trader/app/templates/tv_line.html)): Bundled local JS engine ([`lightweight-charts.standalone.production.js`](file:///c:/Users/Jayvee%20Hilario/OneDrive%20-%20Polytechnic%20University%20of%20the%20Philippines/Desktop/AI%20Crypto%20Trading%20Bot/xauusd-ai-trader/app/templates/lightweight-charts.standalone.production.js)) with dark theme `#0D1117`, SMA & Bollinger overlays, responsive auto-scaling, and equity curve plotting.
 * **12 GUI Pages** ([`app/pages/`](file:///c:/Users/Jayvee%20Hilario/OneDrive%20-%20Polytechnic%20University%20of%20the%20Philippines/Desktop/AI%20Crypto%20Trading%20Bot/xauusd-ai-trader/app/pages)): Overview, Market Chart, Data Foundation, ML Lab, Backtester, Market Intel (Cross-Market & Macro Dynamics), Decision Pipeline, Risk Engine, Small Account, Memory/Similarity, Paper Trading, Logs, Progress Tracker.
+
+### F. News & Calendar Intelligence (`data/`, `models/`)
+* **Calendar Collector** ([`calendar_collector.py`](file:///c:/Users/Jayvee%20Hilario/OneDrive%20-%20Polytechnic%20University%20of%20the%20Philippines/Desktop/AI%20Crypto%20Trading%20Bot/xauusd-ai-trader/data/calendar_collector.py)): Deterministic synthetic NFP and FOMC event generator with UTC normalization.
+* **News Collector** ([`news_collector.py`](file:///c:/Users/Jayvee%20Hilario/OneDrive%20-%20Polytechnic%20University%20of%20the%20Philippines/Desktop/AI%20Crypto%20Trading%20Bot/xauusd-ai-trader/data/news_collector.py)): Multi-source financial RSS feed fetcher and TextBlob sentiment scorer.
+* **Trade Freeze Engine** ([`trade_freeze_engine.py`](file:///c:/Users/Jayvee%20Hilario/OneDrive%20-%20Polytechnic%20University%20of%20the%20Philippines/Desktop/AI%20Crypto%20Trading%20Bot/xauusd-ai-trader/models/trade_freeze_engine.py)): Veto wrapper and pure `apply_freeze_veto` helper that filters non-WAIT predictions within ±freeze_minutes of high-impact releases, wired directly into walk-forward CV and single-split backtests.
 
 ---
 
@@ -131,16 +138,31 @@ Macro-Gated Random Forest      |     18 |          4 |        692 |    31.8% |  
 ## 6. Test Suite & Verification Status
 
 ```
-================================== 110 passed in 2.46s ==================================
+================================== 168 passed in 5.59s ==================================
 ```
 
-All 110 automated unit and integration tests across data validation, store versioning, zero look-ahead macro leakage prevention, macro feature math, models, baselines, and walk-forward engines are passing (100%).
+All 168 automated unit and integration tests across data validation, store versioning,
+zero look-ahead macro leakage prevention, macro feature math, models, baselines,
+walk-forward engines, and the Phase 5 news/calendar/freeze stack are passing (100%).
+
+> [!NOTE]
+> **Known Limitations (Phase 5)**
+> - **Synthetic calendar**: `CalendarCollector` generates NFP/FOMC dates from calendar
+>   arithmetic (first Friday of month, 3rd Wednesday of even months) rather than from
+>   real historical release dates. The News-Frozen benchmark therefore runs against
+>   *estimated* event windows, not confirmed ones. Replacing with real historical data
+>   is a separate task.
+> - **TextBlob sentiment quality**: Sentiment scores are computed via TextBlob polarity
+>   on headline text. This proxy has not been validated against labelled financial
+>   sentiment datasets; its signal contribution is unquantified.
 
 ---
 
-## 7. Immediate Roadmap for Phase 5
+## 7. Immediate Roadmap for Next Phases
 
-Next phase: **Phase 5: News & Economic Event Intelligence Pipeline**:
-1. **Economic Calendar Impact Parser**: Detect impending high-impact events (FOMC, CPI, NFP) and calculate minutes-to-release.
-2. **Pre-News Trade Freeze Engine**: Automatically inject WAIT vetoes within 30 minutes before high-impact economic releases to protect against volatility whipsaws.
-3. **News Sentiment Ingestion**: Ingest financial news headlines for Gold and US Dollar sentiment scoring.
+Next phases: **Phases 6–11: Historical Similarity, Paper & Live Trading**:
+1. **Historical Similarity / Market Regime Matching Engine**: Ingest and index past volatility regimes to identify statistical analogies to current price action.
+2. **Paper Trading Engine**: Connect live MT5 demo account for real-time forward paper testing with execution logging.
+3. **Fail-Closed Safety Enforcement**: Keep live trading strictly locked until all preceding gates achieve statistically verified out-of-sample positive expectancy.
+
+*System is clean, all background tasks are closed, code is fully tested and verified.*

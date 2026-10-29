@@ -33,7 +33,7 @@ from models.classifiers import (
     GradientBoostingModel,
 )
 from models.macro_gated_model import MacroGatedModel
-from models.trade_freeze_engine import TradeFreezeEngine
+from models.trade_freeze_engine import TradeFreezeEngine, apply_freeze_veto
 from models.dataset_builder import build_dataset
 from backtester.backtest_types import BacktestConfig
 from backtester.sim import run_backtest
@@ -183,6 +183,13 @@ def _run_single_holdout(
             model.set_feature_names(feature_cols)
         model.fit(ds.X_train, ds.y_train)
         preds = model.predict(ds.X_test)
+        if isinstance(model, TradeFreezeEngine):
+            preds = apply_freeze_veto(
+                timestamps=test_df["timestamp"],
+                predictions=preds,
+                freeze_minutes=model.freeze_minutes,
+                wait_label=0,
+            )
 
         result = run_backtest(test_df, preds, config=bt_config)
 

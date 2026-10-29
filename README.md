@@ -15,7 +15,7 @@ PySide6 desktop research station for XAUUSD (gold): backtesting, ML classifiers,
 
 ## Status
 
-Research prototype, work in progress. 110 of 110 tests passing. Paper and live trading phases are locked on purpose. See [PROGRESS_REPORT.md](PROGRESS_REPORT.md) for the full phase-by-phase research report.
+Research prototype, work in progress. 168 of 168 tests passing. Paper and live trading phases are locked on purpose. See [PROGRESS_REPORT.md](PROGRESS_REPORT.md) for the full phase-by-phase research report.
 
 ## Run it
 
@@ -42,5 +42,5 @@ Trading-Agent/
     ├── backtester/             # execution simulator, walk-forward engine
     ├── main.py                 # pipeline entry points
     ├── train.py / backtest.py
-    └── tests/                  # 110 tests
+    └── tests/                  # 168 tests
 ```
